@@ -191,7 +191,7 @@ const Hero: React.FC = () => {
               </div>
               
               <p className="text-center text-gray-400 mt-4">
-                "Welcome to VoxWave, where your words become amazing voices."
+                Welcome to VoxWave, where your words become amazing voices.
               </p>
             </div>
           </motion.div>
