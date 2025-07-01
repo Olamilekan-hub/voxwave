@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, X, Volume2, Sun, Moon, Zap } from 'lucide-react'
+import { Menu, X, Volume2, Sun, Moon, Mic, Waveform } from 'lucide-react'
 import Link from 'next/link'
 import { useTheme } from '@/contexts/ThemeContext'
 
@@ -37,7 +37,7 @@ const Navbar: React.FC = () => {
       transition={{ duration: 0.6, ease: 'easeOut' }}
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         isScrolled 
-          ? 'bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-700/50 shadow-lg shadow-gray-900/5' 
+          ? 'glass border-b border-border-secondary shadow-glass' 
           : 'bg-transparent'
       }`}
     >
@@ -51,15 +51,27 @@ const Navbar: React.FC = () => {
               whileTap={{ scale: 0.95 }}
               className="relative"
             >
-              <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl shadow-lg shadow-emerald-500/25 flex items-center justify-center transition-all duration-300 group-hover:shadow-emerald-500/40">
-                <Volume2 className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 bg-gradient-neon rounded-2xl shadow-neon flex items-center justify-center transition-all duration-300 group-hover:shadow-neon-strong">
+                <Volume2 className="w-6 h-6 text-black" />
+              </div>
+              {/* Audio waves around logo */}
+              <div className="absolute -inset-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className="waveform">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="waveform-bar w-1 bg-brand-neon"
+                      style={{ animationDelay: `${i * 0.1}s` }}
+                    ></div>
+                  ))}
+                </div>
               </div>
             </motion.div>
             <div className="flex flex-col">
-              <span className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent">
+              <span className="text-2xl font-bold text-gradient-neon font-display">
                 VoxWave
               </span>
-              <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+              <span className="text-xs text-text-secondary font-medium">
                 AI Voice Platform
               </span>
             </div>
@@ -71,10 +83,10 @@ const Navbar: React.FC = () => {
               <Link
                 key={link.href}
                 href={link.href}
-                className="relative text-gray-700 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 font-medium transition-all duration-200 py-2 group"
+                className="relative text-text-secondary hover:text-brand-green-400 font-medium transition-all duration-200 py-2 group"
               >
                 {link.label}
-                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-emerald-500 transition-all duration-300 group-hover:w-full rounded-full" />
+                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-brand-neon transition-all duration-300 group-hover:w-full rounded-full" />
               </Link>
             ))}
           </div>
@@ -87,7 +99,7 @@ const Navbar: React.FC = () => {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={toggleTheme}
-              className="w-10 h-10 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl flex items-center justify-center transition-all duration-200 border border-gray-200 dark:border-gray-700"
+              className="w-10 h-10 glass rounded-xl flex items-center justify-center transition-all duration-200 border border-border-secondary hover:border-border-accent"
             >
               <AnimatePresence mode="wait">
                 {theme === 'dark' ? (
@@ -98,7 +110,7 @@ const Navbar: React.FC = () => {
                     exit={{ rotate: 90, opacity: 0 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <Sun className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                    <Sun className="w-5 h-5 text-brand-green-400" />
                   </motion.div>
                 ) : (
                   <motion.div
@@ -108,7 +120,7 @@ const Navbar: React.FC = () => {
                     exit={{ rotate: -90, opacity: 0 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <Moon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                    <Moon className="w-5 h-5 text-brand-green-400" />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -118,9 +130,9 @@ const Navbar: React.FC = () => {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 flex items-center space-x-2"
+              className="bg-gradient-neon hover:shadow-neon text-black font-semibold px-6 py-3 rounded-xl transition-all duration-200 flex items-center space-x-2"
             >
-              <Zap className="w-4 h-4" />
+              <Mic className="w-4 h-4" />
               <span>Get Started</span>
             </motion.button>
           </div>
@@ -133,7 +145,7 @@ const Navbar: React.FC = () => {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={toggleTheme}
-              className="w-10 h-10 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl flex items-center justify-center transition-all duration-200 border border-gray-200 dark:border-gray-700"
+              className="w-10 h-10 glass rounded-xl flex items-center justify-center transition-all duration-200 border border-border-secondary"
             >
               <AnimatePresence mode="wait">
                 {theme === 'dark' ? (
@@ -144,7 +156,7 @@ const Navbar: React.FC = () => {
                     exit={{ rotate: 90, opacity: 0 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <Sun className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                    <Sun className="w-5 h-5 text-brand-green-400" />
                   </motion.div>
                 ) : (
                   <motion.div
@@ -154,7 +166,7 @@ const Navbar: React.FC = () => {
                     exit={{ rotate: -90, opacity: 0 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <Moon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                    <Moon className="w-5 h-5 text-brand-green-400" />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -164,12 +176,12 @@ const Navbar: React.FC = () => {
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={toggleMenu}
-              className="w-10 h-10 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl flex items-center justify-center transition-all duration-200 border border-gray-200 dark:border-gray-700"
+              className="w-10 h-10 glass rounded-xl flex items-center justify-center transition-all duration-200 border border-border-secondary"
             >
               {isOpen ? (
-                <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                <X className="w-5 h-5 text-text-primary" />
               ) : (
-                <Menu className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                <Menu className="w-5 h-5 text-text-primary" />
               )}
             </motion.button>
           </div>
@@ -184,7 +196,7 @@ const Navbar: React.FC = () => {
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.3 }}
-            className="lg:hidden bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-t border-gray-200/50 dark:border-gray-700/50"
+            className="lg:hidden glass border-t border-border-secondary"
           >
             <div className="container mx-auto px-6 py-8">
               <div className="space-y-6">
@@ -201,9 +213,10 @@ const Navbar: React.FC = () => {
                       <Link
                         href={link.href}
                         onClick={() => setIsOpen(false)}
-                        className="block text-xl font-medium text-gray-700 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors duration-200 py-3 border-b border-gray-100 dark:border-gray-800"
+                        className="flex items-center space-x-3 text-xl font-medium text-text-secondary hover:text-brand-green-400 transition-colors duration-200 py-3 border-b border-border-primary"
                       >
-                        {link.label}
+                        <Waveform className="w-5 h-5" />
+                        <span>{link.label}</span>
                       </Link>
                     </motion.div>
                   ))}
@@ -218,9 +231,9 @@ const Navbar: React.FC = () => {
                 >
                   <motion.button
                     whileTap={{ scale: 0.95 }}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-4 rounded-xl transition-all duration-200 shadow-lg shadow-emerald-500/25 flex items-center justify-center space-x-2"
+                    className="w-full bg-gradient-neon text-black font-semibold px-6 py-4 rounded-xl transition-all duration-200 shadow-neon flex items-center justify-center space-x-2"
                   >
-                    <Zap className="w-5 h-5" />
+                    <Mic className="w-5 h-5" />
                     <span>Get Started</span>
                   </motion.button>
                 </motion.div>

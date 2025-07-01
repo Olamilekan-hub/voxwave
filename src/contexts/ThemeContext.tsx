@@ -7,6 +7,7 @@ type Theme = 'light' | 'dark'
 interface ThemeContextType {
   theme: Theme
   toggleTheme: () => void
+  setTheme: (theme: Theme) => void
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
@@ -20,33 +21,61 @@ export const useTheme = () => {
 }
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setTheme] = useState<Theme>('dark')
+  const [theme, setThemeState] = useState<Theme>('dark')
+  const [mounted, setMounted] = useState(false)
 
+  // Ensure component is mounted before checking localStorage
   useEffect(() => {
-    // Check for saved theme preference or default to dark
-    const savedTheme = localStorage.getItem('theme') as Theme | null
-    if (savedTheme) {
-      setTheme(savedTheme)
-    }
+    setMounted(true)
+    // Check for saved theme preference or default to dark (VoxWave's primary theme)
+    const savedTheme = localStorage.getItem('voxwave-theme') as Theme | null
+    const systemPreference = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    
+    setThemeState(savedTheme || systemPreference || 'dark')
   }, [])
 
   useEffect(() => {
-    // Apply theme to document
+    if (!mounted) return
+
     const root = document.documentElement
-    if (theme === 'dark') {
-      root.classList.add('dark')
-    } else {
-      root.classList.remove('dark')
+    
+    // Remove both theme classes
+    root.classList.remove('light', 'dark')
+    
+    // Add current theme class
+    root.classList.add(theme)
+    
+    // Set data attribute for CSS variables
+    root.setAttribute('data-theme', theme)
+    
+    // Save to localStorage
+    localStorage.setItem('voxwave-theme', theme)
+    
+    // Update meta theme-color for mobile browsers
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute(
+        'content',
+        theme === 'dark' ? '#000000' : '#ffffff'
+      )
     }
-    localStorage.setItem('theme', theme)
-  }, [theme])
+  }, [theme, mounted])
 
   const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light')
+    setThemeState(prev => prev === 'light' ? 'dark' : 'light')
+  }
+
+  const setTheme = (newTheme: Theme) => {
+    setThemeState(newTheme)
+  }
+
+  // Prevent hydration mismatch by not rendering until mounted
+  if (!mounted) {
+    return null
   }
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
       {children}
     </ThemeContext.Provider>
   )
