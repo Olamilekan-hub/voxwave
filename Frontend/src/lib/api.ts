@@ -83,12 +83,12 @@ export const ttsApi = {
 // Speech-to-Speech API functions
 export const speechToSpeechApi = {
   // Get conversion info and supported formats
-  async getConversionInfo(): Promise<any> {
+  async getConversionInfo(): Promise<ConversionInfoResponse> {
     return apiCall('/api/speech-to-speech/info');
   },
 
   // Convert speech to speech
-  async convertSpeech(formData: FormData): Promise<any> {
+  async convertSpeech(formData: FormData): Promise<SpeechToSpeechResponse> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/speech-to-speech/convert`, {
         method: 'POST',
@@ -112,6 +112,8 @@ export const speechToSpeechApi = {
     }
   },
 };
+
+// Voice API functions for custom voice creation
 export const voiceApi = {
   // Create voice clone
   async createVoice(formData: FormData): Promise<any> {
@@ -307,6 +309,7 @@ export interface Voice {
   category?: string;
   preview_url?: string;
   elevenlabs_voice_id?: string;
+  is_custom?: boolean;
 }
 
 export interface TtsResponse {
@@ -330,6 +333,65 @@ export interface VoicesResponse {
     elevenLabsVoices: Voice[];
     customVoices: Voice[];
     total: number;
+  };
+  message: string;
+}
+
+export interface SpeechToSpeechResponse {
+  success: boolean;
+  data: {
+    fileId: string;
+    audioUrl: string;
+    filename: string;
+    fileSize: number;
+    originalFile: string;
+    originalSize: number;
+    voiceUsed: string;
+    conversionOptions: {
+      model_id: string;
+      voice_settings: {
+        stability: number;
+        similarity_boost: number;
+        style: number;
+        use_speaker_boost: boolean;
+      };
+    };
+    createdAt: string;
+  };
+  message: string;
+}
+
+export interface ConversionInfoResponse {
+  success: boolean;
+  data: {
+    supportedFormats: string[];
+    maxFileSize: string;
+    maxFileSizeBytes: number;
+    supportedModels: Array<{
+      id: string;
+      name: string;
+      description: string;
+    }>;
+    voiceSettings: {
+      stability: {
+        min: number;
+        max: number;
+        default: number;
+        description: string;
+      };
+      similarity_boost: {
+        min: number;
+        max: number;
+        default: number;
+        description: string;
+      };
+      style: {
+        min: number;
+        max: number;
+        default: number;
+        description: string;
+      };
+    };
   };
   message: string;
 }

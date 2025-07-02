@@ -23,6 +23,8 @@ const TextToSpeechPage = () => {
   const [duration, setDuration] = useState(0)
   const audioRef = useRef<HTMLAudioElement>(null)
 
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
   const languages = [
     { code: 'en', name: 'English', flag: '🇺🇸' },
     { code: 'es', name: 'Spanish', flag: '🇪🇸' },
@@ -148,7 +150,7 @@ const TextToSpeechPage = () => {
         setGeneratedAudio(response.data)
         
         // Fetch the audio as blob for better handling
-        const audioResponse = await fetch(`http://localhost:5000${response.data.audioUrl}`)
+        const audioResponse = await fetch(`${API_BASE_URL}${response.data.audioUrl}`)
         if (!audioResponse.ok) {
           throw new Error('Failed to fetch generated audio')
         }

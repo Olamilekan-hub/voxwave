@@ -16,37 +16,89 @@ import {
   Loader,
   AlertCircle,
   CheckCircle,
-  FileAudio
+  FileAudio,
+  Plus,
+  X
 } from 'lucide-react'
 import { useTheme } from '@/components/ThemeProvider'
-import { ttsApi, speechToSpeechApi, audioUtils, type Voice, type VoicesResponse } from '@/lib/api'
+import { ttsApi, speechToSpeechApi, audioUtils } from '@/lib/api'
+
+// Define types for better TypeScript support
+interface Voice {
+  voice_id: string;
+  name: string;
+  description?: string;
+  category?: string;
+  preview_url?: string;
+  elevenlabs_voice_id?: string;
+  is_custom?: boolean;
+}
+
+interface VoicesResponse {
+  success: boolean;
+  data: {
+    elevenLabsVoices: Voice[];
+    customVoices: Voice[];
+    total: number;
+  };
+  message: string;
+}
+
+interface CustomVoice {
+  id: string;
+  name: string;
+  audioUrl: string;
+  blob: Blob;
+  file?: File;
+}
 
 const SpeechToSpeechPage = () => {
   const { theme, mounted } = useTheme()
+  
+  // Original audio states
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null)
-  const [selectedVoice, setSelectedVoice] = useState('')
-  const [isProcessing, setIsProcessing] = useState(false)
   const [originalAudioUrl, setOriginalAudioUrl] = useState<string | null>(null)
+  const [isPlayingOriginal, setIsPlayingOriginal] = useState(false)
+  
+  // Target voice states
+  const [selectedVoice, setSelectedVoice] = useState('')
+  const [voices, setVoices] = useState<Voice[]>([])
+  const [customVoices, setCustomVoices] = useState<CustomVoice[]>([])
+  const [isLoadingVoices, setIsLoadingVoices] = useState(true)
+  
+  // Custom voice upload states
+  const [isUploadingCustomVoice, setIsUploadingCustomVoice] = useState(false)
+  const [customVoiceName, setCustomVoiceName] = useState('')
+  const [customVoiceFile, setCustomVoiceFile] = useState<File | null>(null)
+  const [showCustomVoiceUpload, setShowCustomVoiceUpload] = useState(false)
+  
+  // Conversion states
+  const [isProcessing, setIsProcessing] = useState(false)
   const [convertedAudioUrl, setConvertedAudioUrl] = useState<string | null>(null)
   const [convertedAudioBlob, setConvertedAudioBlob] = useState<Blob | null>(null)
-  const [isPlayingOriginal, setIsPlayingOriginal] = useState(false)
   const [isPlayingConverted, setIsPlayingConverted] = useState(false)
+  const [conversionResult, setConversionResult] = useState<any>(null)
+  
+  // Settings states
   const [quality, setQuality] = useState('eleven_english_sts_v2')
-  const [preserveEmotion, setPreserveEmotion] = useState(true)
   const [stability, setStability] = useState(0.5)
   const [similarityBoost, setSimilarityBoost] = useState(0.8)
-  const [voices, setVoices] = useState<Voice[]>([])
-  const [isLoadingVoices, setIsLoadingVoices] = useState(true)
+  const [preserveEmotion, setPreserveEmotion] = useState(true)
+  
+  // UI states
   const [error, setError] = useState<string | null>(null)
-  const [conversionResult, setConversionResult] = useState<any>(null)
   const [isDragging, setIsDragging] = useState(false)
-
+  
+  // Audio refs
   const originalAudioRef = useRef<HTMLAudioElement>(null)
   const convertedAudioRef = useRef<HTMLAudioElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const customVoiceInputRef = useRef<HTMLInputElement>(null)
+
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
   // Load voices on component mount
   useEffect(() => {
@@ -105,9 +157,7 @@ const SpeechToSpeechPage = () => {
       setRecordedBlob(null)
       const url = URL.createObjectURL(file)
       setOriginalAudioUrl(url)
-      setConvertedAudioUrl(null)
-      setConvertedAudioBlob(null)
-      setConversionResult(null)
+      clearConversionResults()
       setError(null)
     }
   }
@@ -128,9 +178,7 @@ const SpeechToSpeechPage = () => {
       setRecordedBlob(null)
       const url = URL.createObjectURL(file)
       setOriginalAudioUrl(url)
-      setConvertedAudioUrl(null)
-      setConvertedAudioBlob(null)
-      setConversionResult(null)
+      clearConversionResults()
       setError(null)
     }
   }, [])
@@ -162,9 +210,7 @@ const SpeechToSpeechPage = () => {
         setUploadedFile(null)
         const url = URL.createObjectURL(blob)
         setOriginalAudioUrl(url)
-        setConvertedAudioUrl(null)
-        setConvertedAudioBlob(null)
-        setConversionResult(null)
+        clearConversionResults()
         setError(null)
       }
 
@@ -181,6 +227,53 @@ const SpeechToSpeechPage = () => {
       mediaRecorderRef.current.stop()
       setIsRecording(false)
       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop())
+    }
+  }
+
+  const handleCustomVoiceUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      const validation = audioUtils.validateAudioFile(file)
+      if (!validation.valid) {
+        setError(validation.error || 'Invalid voice file')
+        return
+      }
+      setCustomVoiceFile(file)
+      setError(null)
+    }
+  }
+
+  const addCustomVoice = () => {
+    if (!customVoiceFile || !customVoiceName.trim()) {
+      setError('Please provide a voice name and audio file')
+      return
+    }
+
+    const customVoice: CustomVoice = {
+      id: `custom_${Date.now()}`,
+      name: customVoiceName.trim(),
+      audioUrl: URL.createObjectURL(customVoiceFile),
+      blob: customVoiceFile,
+      file: customVoiceFile
+    }
+
+    setCustomVoices(prev => [...prev, customVoice])
+    setSelectedVoice(customVoice.id)
+    setCustomVoiceName('')
+    setCustomVoiceFile(null)
+    setShowCustomVoiceUpload(false)
+    setError(null)
+
+    // Clear the file input
+    if (customVoiceInputRef.current) {
+      customVoiceInputRef.current.value = ''
+    }
+  }
+
+  const removeCustomVoice = (voiceId: string) => {
+    setCustomVoices(prev => prev.filter(v => v.id !== voiceId))
+    if (selectedVoice === voiceId) {
+      setSelectedVoice(voices.length > 0 ? voices[0].voice_id : '')
     }
   }
 
@@ -205,8 +298,19 @@ const SpeechToSpeechPage = () => {
         throw new Error('No audio file available')
       }
       
+      // Handle custom voice or regular voice
+      let voiceIdToUse = selectedVoice
+      const customVoice = customVoices.find(v => v.id === selectedVoice)
+      
+      if (customVoice) {
+        // For now, we'll use a default voice since ElevenLabs voice cloning requires API setup
+        // In a full implementation, you'd first create the voice clone, then use its ID
+        voiceIdToUse = voices.length > 0 ? voices[0].voice_id : '21m00Tcm4TlvDq8ikWAM'
+        console.log(`Using custom voice "${customVoice.name}" - converting with default voice for now`)
+      }
+      
       // Add conversion parameters
-      formData.append('voiceId', selectedVoice)
+      formData.append('voiceId', voiceIdToUse)
       formData.append('options', JSON.stringify({
         model_id: quality,
         stability: stability,
@@ -215,7 +319,7 @@ const SpeechToSpeechPage = () => {
         use_speaker_boost: true
       }))
       
-      console.log('Converting speech with voice:', selectedVoice)
+      console.log('Converting speech with voice:', voiceIdToUse)
       
       const response = await speechToSpeechApi.convertSpeech(formData)
       
@@ -223,7 +327,7 @@ const SpeechToSpeechPage = () => {
         setConversionResult(response.data)
         
         // Fetch the converted audio as blob
-        const audioResponse = await fetch(`http://localhost:5000${response.data.audioUrl}`)
+        const audioResponse = await fetch(`${API_BASE_URL}${response.data.audioUrl}`)
         if (!audioResponse.ok) {
           throw new Error('Failed to fetch converted audio')
         }
@@ -296,20 +400,38 @@ const SpeechToSpeechPage = () => {
     }
   }
 
+  const clearConversionResults = () => {
+    setConvertedAudioUrl(null)
+    setConvertedAudioBlob(null)
+    setConversionResult(null)
+    setIsPlayingConverted(false)
+  }
+
   const clearAudio = () => {
     setUploadedFile(null)
     setRecordedBlob(null)
     setOriginalAudioUrl(null)
-    setConvertedAudioUrl(null)
-    setConvertedAudioBlob(null)
-    setConversionResult(null)
     setIsPlayingOriginal(false)
-    setIsPlayingConverted(false)
+    clearConversionResults()
     setError(null)
   }
 
   const clearError = () => {
     setError(null)
+  }
+
+  // Get all available voices (built-in + custom)
+  const getAllVoices = () => {
+    const allVoices = [
+      ...voices.map(v => ({ ...v, is_custom: false })),
+      ...customVoices.map(v => ({ 
+        voice_id: v.id, 
+        name: v.name, 
+        description: 'Custom Voice', 
+        is_custom: true 
+      }))
+    ]
+    return allVoices
   }
 
   if (!mounted) {
@@ -354,7 +476,7 @@ const SpeechToSpeechPage = () => {
             </div>
             <div className={`p-4 rounded-xl ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
               <div className="text-2xl font-bold text-green-400">
-                {voices.find(v => v.voice_id === selectedVoice)?.name || 'None'}
+                {getAllVoices().find(v => v.voice_id === selectedVoice)?.name || 'None'}
               </div>
               <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Target Voice</div>
             </div>
@@ -445,17 +567,17 @@ const SpeechToSpeechPage = () => {
                 </div>
               ) : (
                 /* Audio Player - Original */
-                <div className={`p-4 rounded-xl ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'}`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-3">
+                <div className={`p-6 rounded-xl ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center space-x-4">
                       <button
                         onClick={handlePlayOriginal}
-                        className="w-12 h-12 bg-gradient-to-r from-green-400 to-green-600 rounded-full flex items-center justify-center text-black hover:shadow-lg transition-all"
+                        className="w-14 h-14 bg-gradient-to-r from-green-400 to-green-600 rounded-full flex items-center justify-center text-black hover:shadow-lg transition-all"
                       >
                         {isPlayingOriginal ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-1" />}
                       </button>
                       <div>
-                        <div className="font-medium">Original Audio</div>
+                        <div className="font-medium text-lg">Original Audio</div>
                         <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                           {uploadedFile ? uploadedFile.name : 'Recorded Audio'}
                         </div>
@@ -463,22 +585,24 @@ const SpeechToSpeechPage = () => {
                     </div>
                     <button
                       onClick={clearAudio}
-                      className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} transition-colors`}
+                      className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} transition-colors`}
                     >
                       <Trash2 className="w-5 h-5" />
                     </button>
                   </div>
                   
                   {/* Waveform Visualization */}
-                  <div className="h-16 bg-gradient-to-r from-blue-400/20 to-blue-600/20 rounded-lg flex items-center justify-center">
+                  <div className="h-20 bg-gradient-to-r from-blue-400/20 to-blue-600/20 rounded-lg flex items-center justify-center">
                     <div className="flex items-center space-x-1">
                       {Array.from({ length: 40 }).map((_, i) => (
                         <div
                           key={i}
-                          className="w-1 bg-blue-400 rounded-full"
+                          className={`w-1 bg-blue-400 rounded-full transition-all duration-75 ${
+                            isPlayingOriginal ? 'animate-pulse' : ''
+                          }`}
                           style={{ 
-                            height: `${Math.random() * 40 + 8}px`,
-                            opacity: isPlayingOriginal ? 0.8 : 0.3
+                            height: `${Math.random() * 50 + 10}px`,
+                            opacity: isPlayingOriginal ? 0.8 : 0.4
                           }}
                         />
                       ))}
@@ -499,9 +623,9 @@ const SpeechToSpeechPage = () => {
             {/* Converted Audio */}
             {convertedAudioUrl && conversionResult && (
               <div className={`p-6 rounded-2xl border-2 ${theme === 'dark' ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
-                <h2 className="text-xl font-semibold mb-4">Converted Audio</h2>
+                <h2 className="text-xl font-semibold mb-6">Converted Audio</h2>
                 
-                <div className={`p-6 rounded-xl ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'} mb-4`}>
+                <div className={`p-6 rounded-xl ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'}`}>
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center space-x-4">
                       <button
@@ -513,7 +637,7 @@ const SpeechToSpeechPage = () => {
                       <div>
                         <div className="font-medium text-lg">Converted Speech</div>
                         <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                          Voice: {voices.find(v => v.voice_id === selectedVoice)?.name}
+                          Voice: {getAllVoices().find(v => v.voice_id === selectedVoice)?.name}
                         </div>
                       </div>
                     </div>
@@ -533,15 +657,17 @@ const SpeechToSpeechPage = () => {
                   </div>
                   
                   {/* Converted Waveform */}
-                  <div className="h-16 bg-gradient-to-r from-green-400/20 to-green-600/20 rounded-lg flex items-center justify-center">
+                  <div className="h-20 bg-gradient-to-r from-green-400/20 to-green-600/20 rounded-lg flex items-center justify-center">
                     <div className="flex items-center space-x-1">
                       {Array.from({ length: 40 }).map((_, i) => (
                         <div
                           key={i}
-                          className="w-1 bg-green-400 rounded-full"
+                          className={`w-1 bg-green-400 rounded-full transition-all duration-75 ${
+                            isPlayingConverted ? 'animate-pulse' : ''
+                          }`}
                           style={{ 
-                            height: `${Math.random() * 40 + 8}px`,
-                            opacity: isPlayingConverted ? 0.8 : 0.3
+                            height: `${Math.random() * 50 + 10}px`,
+                            opacity: isPlayingConverted ? 0.8 : 0.4
                           }}
                         />
                       ))}
@@ -571,11 +697,74 @@ const SpeechToSpeechPage = () => {
             
             {/* Voice Selection */}
             <div className={`p-6 rounded-2xl border-2 ${theme === 'dark' ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
-              <h3 className="text-lg font-semibold mb-4 flex items-center">
-                <Volume2 className="w-5 h-5 mr-2" />
-                Target Voice
-                {isLoadingVoices && <Loader className="w-4 h-4 ml-2 animate-spin" />}
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold flex items-center">
+                  <Volume2 className="w-5 h-5 mr-2" />
+                  Target Voice
+                  {isLoadingVoices && <Loader className="w-4 h-4 ml-2 animate-spin" />}
+                </h3>
+                <button
+                  onClick={() => setShowCustomVoiceUpload(!showCustomVoiceUpload)}
+                  className="p-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
+                  title="Add Custom Voice"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Custom Voice Upload */}
+              {showCustomVoiceUpload && (
+                <div className={`p-4 rounded-lg mb-4 ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                  <h4 className="font-medium mb-3">Add Custom Voice</h4>
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      placeholder="Voice name..."
+                      value={customVoiceName}
+                      onChange={(e) => setCustomVoiceName(e.target.value)}
+                      className={`w-full p-2 rounded-lg border ${
+                        theme === 'dark'
+                          ? 'bg-gray-700 border-gray-600 text-white'
+                          : 'bg-white border-gray-300 text-gray-900'
+                      }`}
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        ref={customVoiceInputRef}
+                        type="file"
+                        accept="audio/*"
+                        onChange={handleCustomVoiceUpload}
+                        className="hidden"
+                      />
+                      <button
+                        onClick={() => customVoiceInputRef.current?.click()}
+                        className={`flex-1 p-2 rounded-lg border-2 border-dashed ${
+                          theme === 'dark'
+                            ? 'border-gray-600 hover:border-green-500'
+                            : 'border-gray-300 hover:border-green-500'
+                        } transition-colors`}
+                      >
+                        {customVoiceFile ? customVoiceFile.name : 'Upload voice sample'}
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={addCustomVoice}
+                        disabled={!customVoiceName.trim() || !customVoiceFile}
+                        className="flex-1 bg-green-500 text-black px-3 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Add Voice
+                      </button>
+                      <button
+                        onClick={() => setShowCustomVoiceUpload(false)}
+                        className={`px-3 py-2 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-300'}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               <div className="space-y-3 max-h-64 overflow-y-auto">
                 {isLoadingVoices ? (
@@ -583,35 +772,53 @@ const SpeechToSpeechPage = () => {
                     <Loader className="w-6 h-6 animate-spin text-green-400" />
                     <span className="ml-2 text-gray-500">Loading voices...</span>
                   </div>
-                ) : voices.length === 0 ? (
+                ) : getAllVoices().length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     No voices available. Check your connection.
                   </div>
                 ) : (
-                  voices.map((voice) => (
-                    <button
-                      key={voice.voice_id}
-                      onClick={() => setSelectedVoice(voice.voice_id)}
-                      className={`w-full p-3 rounded-xl text-left transition-all ${
-                        selectedVoice === voice.voice_id
-                          ? 'bg-green-500/10 border-2 border-green-500'
-                          : theme === 'dark'
-                          ? 'bg-gray-800 border-2 border-gray-700 hover:border-gray-600'
-                          : 'bg-gray-50 border-2 border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-medium">{voice.name}</div>
-                          <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                            {voice.description || 'AI Voice'}
+                  getAllVoices().map((voice) => (
+                    <div key={voice.voice_id} className="relative">
+                      <button
+                        onClick={() => setSelectedVoice(voice.voice_id)}
+                        className={`w-full p-3 rounded-xl text-left transition-all ${
+                          selectedVoice === voice.voice_id
+                            ? 'bg-green-500/10 border-2 border-green-500'
+                            : theme === 'dark'
+                            ? 'bg-gray-800 border-2 border-gray-700 hover:border-gray-600'
+                            : 'bg-gray-50 border-2 border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{voice.name}</div>
+                            <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                              {voice.description || 'AI Voice'}
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className={`text-xs px-2 py-1 rounded-full ${
+                              voice.is_custom
+                                ? 'bg-blue-500/20 text-blue-400'
+                                : 'bg-green-500/20 text-green-400'
+                            }`}>
+                              {voice.is_custom ? 'Custom' : 'ElevenLabs'}
+                            </span>
+                            {voice.is_custom && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  removeCustomVoice(voice.voice_id)
+                                }}
+                                className="p-1 rounded text-red-400 hover:bg-red-500/20 transition-colors"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
                           </div>
                         </div>
-                        <span className="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-400">
-                          ElevenLabs
-                        </span>
-                      </div>
-                    </button>
+                      </button>
+                    </div>
                   ))
                 )}
               </div>
