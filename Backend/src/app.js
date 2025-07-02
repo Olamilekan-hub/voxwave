@@ -9,6 +9,7 @@ require("dotenv").config();
 const ttsRoutes = require("./routes/tts");
 const voiceRoutes = require("./routes/voice");
 const sttRoutes = require("./routes/stt");
+const speechToSpeechRoutes = require("./routes/sts");
 
 // Import database
 const { testConnection, initializeDatabase } = require("./config/database");
@@ -17,7 +18,10 @@ const { ElevenLabsService } = require("./config/elevenlabs");
 const app = express();
 
 // Middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginEmbedderPolicy: false
+}));
 app.use(morgan("combined"));
 app.use(
   cors({
@@ -30,8 +34,21 @@ app.use(
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-// Serve uploaded files
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+// Serve uploaded files with proper headers
+app.use("/uploads", (req, res, next) => {
+  // Set proper headers for audio files
+  if (req.path.match(/\.(mp3|wav|m4a|ogg)$/)) {
+    res.set({
+      'Content-Type': 'audio/mpeg',
+      'Accept-Ranges': 'bytes',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+      'Access-Control-Allow-Headers': 'Range',
+      'Cache-Control': 'public, max-age=3600'
+    });
+  }
+  next();
+}, express.static(path.join(__dirname, "../uploads")));
 
 // Health check endpoint
 app.get("/health", (req, res) => {
@@ -60,7 +77,7 @@ app.get("/api/info", async (req, res) => {
       },
       endpoints: {
         textToSpeech: "/api/tts",
-        speechToSpeech: "/api/voice/convert",
+        speechToSpeech: "/api/speech-to-speech",
         speechToText: "/api/stt",
         voices: "/api/voice",
         health: "/health",
@@ -78,6 +95,7 @@ app.get("/api/info", async (req, res) => {
 
 // API Routes
 app.use("/api/tts", ttsRoutes);
+app.use("/api/speech-to-speech", speechToSpeechRoutes);
 // app.use('/api/voice', voiceRoutes);
 // app.use('/api/stt', sttRoutes);
 
@@ -90,6 +108,9 @@ app.use("*", (req, res) => {
       "GET /health",
       "GET /api/info",
       "POST /api/tts/generate",
+      "GET /api/tts/voices",
+      "POST /api/speech-to-speech/convert",
+      "GET /api/speech-to-speech/info",
       "POST /api/voice/create",
       "POST /api/voice/convert",
       "GET /api/voice/list",

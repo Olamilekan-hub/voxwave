@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useCallback } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { 
   Play, 
   Pause, 
@@ -13,64 +13,136 @@ import {
   Settings, 
   Trash2, 
   RefreshCw, 
-  Loader 
+  Loader,
+  AlertCircle,
+  CheckCircle,
+  FileAudio
 } from 'lucide-react'
 import { useTheme } from '@/components/ThemeProvider'
+import { ttsApi, speechToSpeechApi, audioUtils, type Voice, type VoicesResponse } from '@/lib/api'
 
 const SpeechToSpeechPage = () => {
   const { theme, mounted } = useTheme()
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null)
-  const [selectedVoice, setSelectedVoice] = useState('sarah')
+  const [selectedVoice, setSelectedVoice] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [originalAudioUrl, setOriginalAudioUrl] = useState<string | null>(null)
   const [convertedAudioUrl, setConvertedAudioUrl] = useState<string | null>(null)
+  const [convertedAudioBlob, setConvertedAudioBlob] = useState<Blob | null>(null)
   const [isPlayingOriginal, setIsPlayingOriginal] = useState(false)
   const [isPlayingConverted, setIsPlayingConverted] = useState(false)
-  const [quality, setQuality] = useState('high')
+  const [quality, setQuality] = useState('eleven_english_sts_v2')
   const [preserveEmotion, setPreserveEmotion] = useState(true)
-  const [speed, setSpeed] = useState(1)
+  const [stability, setStability] = useState(0.5)
+  const [similarityBoost, setSimilarityBoost] = useState(0.8)
+  const [voices, setVoices] = useState<Voice[]>([])
+  const [isLoadingVoices, setIsLoadingVoices] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [conversionResult, setConversionResult] = useState<any>(null)
+  const [isDragging, setIsDragging] = useState(false)
 
   const originalAudioRef = useRef<HTMLAudioElement>(null)
   const convertedAudioRef = useRef<HTMLAudioElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const voices = [
-    { id: 'sarah', name: 'Sarah', description: 'Natural, warm female voice', category: 'Premium' },
-    { id: 'michael', name: 'Michael', description: 'Professional male voice', category: 'Premium' },
-    { id: 'emma', name: 'Emma', description: 'Young, energetic female voice', category: 'Premium' },
-    { id: 'david', name: 'David', description: 'Deep, authoritative male voice', category: 'Premium' },
-    { id: 'sophia', name: 'Sophia', description: 'Elegant, sophisticated voice', category: 'Premium' },
-    { id: 'james', name: 'James', description: 'Friendly, conversational tone', category: 'Premium' },
-  ]
+  // Load voices on component mount
+  useEffect(() => {
+    loadVoices()
+  }, [])
+
+  const loadVoices = async () => {
+    try {
+      setIsLoadingVoices(true)
+      setError(null)
+      
+      const response: VoicesResponse = await ttsApi.getVoices()
+      
+      if (response.success) {
+        const allVoices = [
+          ...response.data.elevenLabsVoices,
+          ...response.data.customVoices
+        ]
+        setVoices(allVoices)
+        
+        if (allVoices.length > 0 && !selectedVoice) {
+          setSelectedVoice(allVoices[0].voice_id)
+        }
+      } else {
+        throw new Error('Failed to load voices')
+      }
+    } catch (error) {
+      console.error('Error loading voices:', error)
+      setError(`Failed to load voices: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      
+      // Fallback voices
+      const fallbackVoices = [
+        { voice_id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel', description: 'Natural, warm female voice' },
+        { voice_id: 'AZnzlk1XvdvUeBnXmlld', name: 'Domi', description: 'Strong, confident female voice' },
+        { voice_id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella', description: 'Sweet, friendly female voice' },
+      ]
+      setVoices(fallbackVoices)
+      if (!selectedVoice) {
+        setSelectedVoice(fallbackVoices[0].voice_id)
+      }
+    } finally {
+      setIsLoadingVoices(false)
+    }
+  }
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (file && file.type.startsWith('audio/')) {
+    if (file) {
+      const validation = audioUtils.validateAudioFile(file)
+      if (!validation.valid) {
+        setError(validation.error || 'Invalid file')
+        return
+      }
+      
       setUploadedFile(file)
       setRecordedBlob(null)
       const url = URL.createObjectURL(file)
       setOriginalAudioUrl(url)
       setConvertedAudioUrl(null)
+      setConvertedAudioBlob(null)
+      setConversionResult(null)
+      setError(null)
     }
   }
 
   const handleDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault()
+    setIsDragging(false)
+    
     const file = event.dataTransfer.files[0]
-    if (file && file.type.startsWith('audio/')) {
+    if (file) {
+      const validation = audioUtils.validateAudioFile(file)
+      if (!validation.valid) {
+        setError(validation.error || 'Invalid file')
+        return
+      }
+      
       setUploadedFile(file)
       setRecordedBlob(null)
       const url = URL.createObjectURL(file)
       setOriginalAudioUrl(url)
       setConvertedAudioUrl(null)
+      setConvertedAudioBlob(null)
+      setConversionResult(null)
+      setError(null)
     }
   }, [])
 
   const handleDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault()
+    setIsDragging(true)
+  }, [])
+
+  const handleDragLeave = useCallback((event: React.DragEvent) => {
+    event.preventDefault()
+    setIsDragging(false)
   }, [])
 
   const startRecording = async () => {
@@ -91,12 +163,16 @@ const SpeechToSpeechPage = () => {
         const url = URL.createObjectURL(blob)
         setOriginalAudioUrl(url)
         setConvertedAudioUrl(null)
+        setConvertedAudioBlob(null)
+        setConversionResult(null)
+        setError(null)
       }
 
       mediaRecorder.start()
       setIsRecording(true)
     } catch (error) {
       console.error('Error starting recording:', error)
+      setError('Failed to start recording. Please check microphone permissions.')
     }
   }
 
@@ -109,52 +185,114 @@ const SpeechToSpeechPage = () => {
   }
 
   const handleConvert = async () => {
-    if (!originalAudioUrl) return
+    if (!originalAudioUrl || !selectedVoice) {
+      setError('Please upload an audio file and select a voice')
+      return
+    }
 
     setIsProcessing(true)
+    setError(null)
     
     try {
-      // Simulate API call to ElevenLabs
-      await new Promise(resolve => setTimeout(resolve, 4000))
+      const formData = new FormData()
       
-      // In real implementation, this would be the converted audio URL
-      setConvertedAudioUrl('/api/converted-audio.mp3')
+      // Add the audio file
+      if (uploadedFile) {
+        formData.append('audio', uploadedFile)
+      } else if (recordedBlob) {
+        formData.append('audio', recordedBlob, 'recorded-audio.wav')
+      } else {
+        throw new Error('No audio file available')
+      }
+      
+      // Add conversion parameters
+      formData.append('voiceId', selectedVoice)
+      formData.append('options', JSON.stringify({
+        model_id: quality,
+        stability: stability,
+        similarity_boost: similarityBoost,
+        style: preserveEmotion ? 0.5 : 0.0,
+        use_speaker_boost: true
+      }))
+      
+      console.log('Converting speech with voice:', selectedVoice)
+      
+      const response = await speechToSpeechApi.convertSpeech(formData)
+      
+      if (response.success) {
+        setConversionResult(response.data)
+        
+        // Fetch the converted audio as blob
+        const audioResponse = await fetch(`http://localhost:5000${response.data.audioUrl}`)
+        if (!audioResponse.ok) {
+          throw new Error('Failed to fetch converted audio')
+        }
+        
+        const blob = await audioResponse.blob()
+        const blobUrl = URL.createObjectURL(blob)
+        
+        setConvertedAudioBlob(blob)
+        setConvertedAudioUrl(blobUrl)
+        setError(null)
+        
+        console.log('Speech conversion completed successfully')
+      } else {
+        throw new Error('Speech conversion failed')
+      }
       
     } catch (error) {
       console.error('Error converting speech:', error)
+      setError(`Failed to convert speech: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setIsProcessing(false)
     }
   }
 
-  const handlePlayOriginal = () => {
-    if (originalAudioRef.current) {
+  const handlePlayOriginal = async () => {
+    if (!originalAudioRef.current) return
+    
+    try {
       if (isPlayingOriginal) {
         originalAudioRef.current.pause()
+        setIsPlayingOriginal(false)
       } else {
-        originalAudioRef.current.play()
+        await originalAudioRef.current.play()
+        setIsPlayingOriginal(true)
       }
-      setIsPlayingOriginal(!isPlayingOriginal)
+    } catch (error) {
+      console.error('Error playing original audio:', error)
+      setError('Failed to play original audio')
     }
   }
 
-  const handlePlayConverted = () => {
-    if (convertedAudioRef.current) {
+  const handlePlayConverted = async () => {
+    if (!convertedAudioRef.current) return
+    
+    try {
       if (isPlayingConverted) {
         convertedAudioRef.current.pause()
+        setIsPlayingConverted(false)
       } else {
-        convertedAudioRef.current.play()
+        await convertedAudioRef.current.play()
+        setIsPlayingConverted(true)
       }
-      setIsPlayingConverted(!isPlayingConverted)
+    } catch (error) {
+      console.error('Error playing converted audio:', error)
+      setError('Failed to play converted audio')
     }
   }
 
   const handleDownload = () => {
-    if (convertedAudioUrl) {
-      const link = document.createElement('a')
-      link.href = convertedAudioUrl
-      link.download = 'voxwave-converted-speech.mp3'
-      link.click()
+    if (!convertedAudioBlob || !conversionResult) return
+    
+    try {
+      audioUtils.downloadBlob(
+        convertedAudioBlob, 
+        conversionResult.filename || 'voxwave-converted-speech.mp3'
+      )
+    } catch (error) {
+      console.error('Error downloading audio:', error)
+      setError('Failed to download audio')
     }
   }
 
@@ -163,8 +301,15 @@ const SpeechToSpeechPage = () => {
     setRecordedBlob(null)
     setOriginalAudioUrl(null)
     setConvertedAudioUrl(null)
+    setConvertedAudioBlob(null)
+    setConversionResult(null)
     setIsPlayingOriginal(false)
     setIsPlayingConverted(false)
+    setError(null)
+  }
+
+  const clearError = () => {
+    setError(null)
   }
 
   if (!mounted) {
@@ -197,25 +342,43 @@ const SpeechToSpeechPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className={`p-4 rounded-xl ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
               <div className="text-2xl font-bold text-green-400">
-                {uploadedFile ? `${(uploadedFile.size / 1024 / 1024).toFixed(1)} MB` : '0 MB'}
+                {uploadedFile ? audioUtils.formatFileSize(uploadedFile.size) : '0 MB'}
               </div>
               <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>File Size</div>
             </div>
             <div className={`p-4 rounded-xl ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
               <div className="text-2xl font-bold text-green-400">
-                {quality === 'high' ? 'HD' : quality === 'medium' ? 'SD' : 'Fast'}
+                {quality === 'eleven_english_sts_v2' ? 'English' : 'Multilingual'}
               </div>
-              <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Quality</div>
+              <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Model</div>
             </div>
             <div className={`p-4 rounded-xl ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
               <div className="text-2xl font-bold text-green-400">
-                {voices.find(v => v.id === selectedVoice)?.name || 'None'}
+                {voices.find(v => v.voice_id === selectedVoice)?.name || 'None'}
               </div>
               <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Target Voice</div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <AlertCircle className="w-5 h-5 text-red-400" />
+              <span className="text-red-400">{error}</span>
+            </div>
+            <button
+              onClick={clearError}
+              className="text-red-400 hover:text-red-300 transition-colors"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid lg:grid-cols-3 gap-8">
@@ -233,8 +396,11 @@ const SpeechToSpeechPage = () => {
                   <div
                     onDrop={handleDrop}
                     onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
                     className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
-                      theme === 'dark'
+                      isDragging 
+                        ? 'border-green-500 bg-green-500/10' 
+                        : theme === 'dark'
                         ? 'border-gray-600 hover:border-green-500 bg-gray-800/50'
                         : 'border-gray-300 hover:border-green-500 bg-gray-50'
                     }`}
@@ -331,32 +497,39 @@ const SpeechToSpeechPage = () => {
             </div>
 
             {/* Converted Audio */}
-            {convertedAudioUrl && (
+            {convertedAudioUrl && conversionResult && (
               <div className={`p-6 rounded-2xl border-2 ${theme === 'dark' ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
                 <h2 className="text-xl font-semibold mb-4">Converted Audio</h2>
                 
-                <div className={`p-4 rounded-xl ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'} mb-4`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-3">
+                <div className={`p-6 rounded-xl ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'} mb-4`}>
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center space-x-4">
                       <button
                         onClick={handlePlayConverted}
-                        className="w-12 h-12 bg-gradient-to-r from-green-400 to-green-600 rounded-full flex items-center justify-center text-black hover:shadow-lg transition-all"
+                        className="w-14 h-14 bg-gradient-to-r from-green-400 to-green-600 rounded-full flex items-center justify-center text-black hover:shadow-lg transition-all"
                       >
                         {isPlayingConverted ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-1" />}
                       </button>
                       <div>
-                        <div className="font-medium">Converted Speech</div>
+                        <div className="font-medium text-lg">Converted Speech</div>
                         <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                          Voice: {voices.find(v => v.id === selectedVoice)?.name}
+                          Voice: {voices.find(v => v.voice_id === selectedVoice)?.name}
                         </div>
                       </div>
                     </div>
-                    <button
-                      onClick={handleDownload}
-                      className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} transition-colors`}
-                    >
-                      <Download className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center space-x-3">
+                      <div className="text-right">
+                        <div className="text-sm font-medium">{audioUtils.formatFileSize(conversionResult.fileSize)}</div>
+                        <div className="text-xs text-gray-500">Converted</div>
+                      </div>
+                      <button
+                        onClick={handleDownload}
+                        className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} transition-colors`}
+                        title="Download Converted Audio"
+                      >
+                        <Download className="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
                   
                   {/* Converted Waveform */}
@@ -376,15 +549,18 @@ const SpeechToSpeechPage = () => {
                   </div>
                 </div>
 
+                {/* Hidden Audio Elements */}
                 <audio 
                   ref={originalAudioRef} 
                   src={originalAudioUrl || undefined} 
-                  onEnded={() => setIsPlayingOriginal(false)} 
+                  onEnded={() => setIsPlayingOriginal(false)}
+                  style={{ display: 'none' }}
                 />
                 <audio 
                   ref={convertedAudioRef} 
                   src={convertedAudioUrl} 
-                  onEnded={() => setIsPlayingConverted(false)} 
+                  onEnded={() => setIsPlayingConverted(false)}
+                  style={{ display: 'none' }}
                 />
               </div>
             )}
@@ -398,34 +574,46 @@ const SpeechToSpeechPage = () => {
               <h3 className="text-lg font-semibold mb-4 flex items-center">
                 <Volume2 className="w-5 h-5 mr-2" />
                 Target Voice
+                {isLoadingVoices && <Loader className="w-4 h-4 ml-2 animate-spin" />}
               </h3>
               
               <div className="space-y-3 max-h-64 overflow-y-auto">
-                {voices.map((voice) => (
-                  <button
-                    key={voice.id}
-                    onClick={() => setSelectedVoice(voice.id)}
-                    className={`w-full p-3 rounded-xl text-left transition-all ${
-                      selectedVoice === voice.id
-                        ? 'bg-green-500/10 border-2 border-green-500'
-                        : theme === 'dark'
-                        ? 'bg-gray-800 border-2 border-gray-700 hover:border-gray-600'
-                        : 'bg-gray-50 border-2 border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">{voice.name}</div>
-                        <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                          {voice.description}
+                {isLoadingVoices ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader className="w-6 h-6 animate-spin text-green-400" />
+                    <span className="ml-2 text-gray-500">Loading voices...</span>
+                  </div>
+                ) : voices.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    No voices available. Check your connection.
+                  </div>
+                ) : (
+                  voices.map((voice) => (
+                    <button
+                      key={voice.voice_id}
+                      onClick={() => setSelectedVoice(voice.voice_id)}
+                      className={`w-full p-3 rounded-xl text-left transition-all ${
+                        selectedVoice === voice.voice_id
+                          ? 'bg-green-500/10 border-2 border-green-500'
+                          : theme === 'dark'
+                          ? 'bg-gray-800 border-2 border-gray-700 hover:border-gray-600'
+                          : 'bg-gray-50 border-2 border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium">{voice.name}</div>
+                          <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {voice.description || 'AI Voice'}
+                          </div>
                         </div>
+                        <span className="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-400">
+                          ElevenLabs
+                        </span>
                       </div>
-                      <span className="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-400">
-                        {voice.category}
-                      </span>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  ))
+                )}
               </div>
             </div>
 
@@ -438,7 +626,7 @@ const SpeechToSpeechPage = () => {
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Quality</label>
+                  <label className="block text-sm font-medium mb-2">Model</label>
                   <select 
                     value={quality}
                     onChange={(e) => setQuality(e.target.value)}
@@ -448,25 +636,45 @@ const SpeechToSpeechPage = () => {
                         : 'bg-gray-50 border-gray-200 text-gray-900'
                     } focus:border-green-500 focus:outline-none`}
                   >
-                    <option value="high">High Quality (Slower)</option>
-                    <option value="medium">Medium Quality</option>
-                    <option value="fast">Fast Processing</option>
+                    <option value="eleven_english_sts_v2">English Model (Faster)</option>
+                    <option value="eleven_multilingual_sts_v2">Multilingual Model</option>
                   </select>
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Speed: {speed}x
+                    Stability: {stability.toFixed(1)}
                   </label>
                   <input
                     type="range"
-                    min="0.5"
-                    max="2"
+                    min="0"
+                    max="1"
                     step="0.1"
-                    value={speed}
-                    onChange={(e) => setSpeed(parseFloat(e.target.value))}
+                    value={stability}
+                    onChange={(e) => setStability(parseFloat(e.target.value))}
                     className="w-full accent-green-500"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Higher values make voice more stable but less expressive
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Similarity Boost: {similarityBoost.toFixed(1)}
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={similarityBoost}
+                    onChange={(e) => setSimilarityBoost(parseFloat(e.target.value))}
+                    className="w-full accent-green-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Enhances similarity to the target voice
+                  </p>
                 </div>
 
                 <div className="flex items-center justify-between">
@@ -488,7 +696,7 @@ const SpeechToSpeechPage = () => {
             {/* Convert Button */}
             <button
               onClick={handleConvert}
-              disabled={!originalAudioUrl || isProcessing}
+              disabled={!originalAudioUrl || !selectedVoice || isProcessing || isLoadingVoices}
               className="w-full bg-gradient-to-r from-green-400 to-green-600 text-black py-4 rounded-xl font-semibold hover:shadow-lg hover:shadow-green-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
             >
               {isProcessing ? (
@@ -503,6 +711,16 @@ const SpeechToSpeechPage = () => {
                 </>
               )}
             </button>
+
+            {/* Success Message */}
+            {conversionResult && (
+              <div className="bg-green-500/10 border border-green-500/50 rounded-xl p-4 flex items-center space-x-3">
+                <CheckCircle className="w-5 h-5 text-green-400" />
+                <span className="text-green-400 text-sm">
+                  Speech converted successfully! File: {conversionResult.filename}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>

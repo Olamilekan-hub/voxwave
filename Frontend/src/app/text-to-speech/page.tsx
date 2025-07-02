@@ -14,10 +14,13 @@ const TextToSpeechPage = () => {
   const [isGenerating, setIsGenerating] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [voices, setVoices] = useState<Voice[]>([])
   const [isLoadingVoices, setIsLoadingVoices] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [generatedAudio, setGeneratedAudio] = useState<TtsResponse['data'] | null>(null)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
   const audioRef = useRef<HTMLAudioElement>(null)
 
   const languages = [
@@ -39,6 +42,43 @@ const TextToSpeechPage = () => {
   useEffect(() => {
     loadVoices()
   }, [])
+
+  // Audio event handlers
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    const handleLoadedMetadata = () => {
+      setDuration(audio.duration)
+    }
+
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime)
+    }
+
+    const handleEnded = () => {
+      setIsPlaying(false)
+      setCurrentTime(0)
+    }
+
+    const handleError = (e: any) => {
+      console.error('Audio error:', e)
+      setError('Failed to load generated audio. Please try generating again.')
+      setIsPlaying(false)
+    }
+
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata)
+    audio.addEventListener('timeupdate', handleTimeUpdate)
+    audio.addEventListener('ended', handleEnded)
+    audio.addEventListener('error', handleError)
+
+    return () => {
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata)
+      audio.removeEventListener('timeupdate', handleTimeUpdate)
+      audio.removeEventListener('ended', handleEnded)
+      audio.removeEventListener('error', handleError)
+    }
+  }, [audioUrl])
 
   const loadVoices = async () => {
     try {
@@ -106,7 +146,18 @@ const TextToSpeechPage = () => {
       
       if (response.success) {
         setGeneratedAudio(response.data)
-        setAudioUrl(`http://localhost:5000${response.data.audioUrl}`)
+        
+        // Fetch the audio as blob for better handling
+        const audioResponse = await fetch(`http://localhost:5000${response.data.audioUrl}`)
+        if (!audioResponse.ok) {
+          throw new Error('Failed to fetch generated audio')
+        }
+        
+        const blob = await audioResponse.blob()
+        const blobUrl = URL.createObjectURL(blob)
+        
+        setAudioBlob(blob)
+        setAudioUrl(blobUrl)
         setError(null)
       } else {
         throw new Error('Failed to generate speech')
@@ -120,23 +171,38 @@ const TextToSpeechPage = () => {
     }
   }
 
-  const handlePlay = () => {
-    if (audioRef.current) {
+  const handlePlay = async () => {
+    if (!audioRef.current || !audioUrl) return
+    
+    try {
       if (isPlaying) {
         audioRef.current.pause()
+        setIsPlaying(false)
       } else {
-        audioRef.current.play()
+        await audioRef.current.play()
+        setIsPlaying(true)
       }
-      setIsPlaying(!isPlaying)
+    } catch (error) {
+      console.error('Error playing audio:', error)
+      setError('Failed to play audio. Please try again.')
     }
   }
 
   const handleDownload = () => {
-    if (audioUrl && generatedAudio) {
+    if (!audioBlob || !generatedAudio) return
+    
+    try {
+      const url = URL.createObjectURL(audioBlob)
       const link = document.createElement('a')
-      link.href = audioUrl
+      link.href = url
       link.download = generatedAudio.filename || 'voxwave-speech.mp3'
+      document.body.appendChild(link)
       link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Error downloading audio:', error)
+      setError('Failed to download audio. Please try again.')
     }
   }
 
@@ -146,6 +212,21 @@ const TextToSpeechPage = () => {
 
   const clearError = () => {
     setError(null)
+  }
+
+  const formatTime = (time: number) => {
+    const minutes = Math.floor(time / 60)
+    const seconds = Math.floor(time % 60)
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`
+  }
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const audio = audioRef.current
+    if (!audio) return
+    
+    const newTime = (parseFloat(e.target.value) / 100) * duration
+    audio.currentTime = newTime
+    setCurrentTime(newTime)
   }
 
   if (!mounted) {
@@ -269,43 +350,65 @@ const TextToSpeechPage = () => {
               <div className={`p-6 rounded-2xl border-2 ${theme === 'dark' ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
                 <h2 className="text-xl font-semibold mb-4">Generated Audio</h2>
                 
-                <div className={`p-4 rounded-xl ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'} mb-4`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-3">
+                <div className={`p-6 rounded-xl ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'} mb-4`}>
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center space-x-4">
                       <button
                         onClick={handlePlay}
-                        className="w-12 h-12 bg-gradient-to-r from-green-400 to-green-600 rounded-full flex items-center justify-center text-black hover:shadow-lg transition-all"
+                        disabled={isGenerating}
+                        className="w-14 h-14 bg-gradient-to-r from-green-400 to-green-600 rounded-full flex items-center justify-center text-black hover:shadow-lg transition-all disabled:opacity-50"
                       >
                         {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-1" />}
                       </button>
                       <div>
-                        <div className="font-medium">Generated Speech</div>
+                        <div className="font-medium text-lg">Generated Speech</div>
                         <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                           Voice: {voices.find(v => v.voice_id === selectedVoice)?.name || 'Unknown'}
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-3">
                       <div className="text-right">
                         <div className="text-sm font-medium">{generatedAudio.characterCount} chars</div>
                         <div className="text-xs text-gray-500">{(generatedAudio.fileSize / 1024).toFixed(1)} KB</div>
                       </div>
                       <button
                         onClick={handleDownload}
-                        className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} transition-colors`}
+                        className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} transition-colors`}
+                        title="Download Audio"
                       >
                         <Download className="w-5 h-5" />
                       </button>
                     </div>
                   </div>
                   
+                  {/* Audio Progress Bar */}
+                  {duration > 0 && (
+                    <div className="space-y-2">
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={duration > 0 ? (currentTime / duration) * 100 : 0}
+                        onChange={handleSeek}
+                        className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-green-500"
+                      />
+                      <div className="flex justify-between text-sm text-gray-500">
+                        <span>{formatTime(currentTime)}</span>
+                        <span>{formatTime(duration)}</span>
+                      </div>
+                    </div>
+                  )}
+                  
                   {/* Audio Waveform Visualization */}
-                  <div className="h-16 bg-gradient-to-r from-green-400/20 to-green-600/20 rounded-lg flex items-center justify-center">
+                  <div className="h-16 bg-gradient-to-r from-green-400/20 to-green-600/20 rounded-lg flex items-center justify-center mt-4">
                     <div className="flex items-center space-x-1">
                       {Array.from({ length: 50 }).map((_, i) => (
                         <div
                           key={i}
-                          className="w-1 bg-green-400 rounded-full"
+                          className={`w-1 bg-green-400 rounded-full transition-all duration-75 ${
+                            isPlaying ? 'animate-pulse' : ''
+                          }`}
                           style={{ 
                             height: `${Math.random() * 40 + 8}px`,
                             opacity: isPlaying ? 0.8 : 0.3
@@ -316,11 +419,12 @@ const TextToSpeechPage = () => {
                   </div>
                 </div>
 
+                {/* Hidden Audio Element */}
                 <audio 
                   ref={audioRef} 
                   src={audioUrl} 
-                  onEnded={() => setIsPlaying(false)}
-                  onError={() => setError('Failed to load generated audio')}
+                  preload="metadata"
+                  style={{ display: 'none' }}
                 />
               </div>
             )}
