@@ -9,54 +9,98 @@ require("dotenv").config();
 const ttsRoutes = require("./routes/tts");
 const voiceRoutes = require("./routes/voice");
 const sttRoutes = require("./routes/stt");
-const speechToSpeechRoutes = require("./routes/sts");
 
 // Import database
 const { testConnection, initializeDatabase } = require("./config/database");
 const { ElevenLabsService } = require("./config/elevenlabs");
+const { getUploadPath } = require("./middleware/upload");
 
 const app = express();
 
-// Middleware
+// Security middleware
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
-  crossOriginEmbedderPolicy: false
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://api.elevenlabs.io"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'", "blob:"],
+      frameSrc: ["'none'"],
+    },
+  },
 }));
-app.use(morgan("combined"));
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
-    credentials: true,
-  })
-);
+
+// Logging
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+// CORS configuration
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, etc.)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      process.env.FRONTEND_URL,
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'https://voxwave.vercel.app', // Add your deployed frontend URLs
+    ].filter(Boolean);
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
+};
+
+app.use(cors(corsOptions));
+
+// Trust proxy (important for Render)
+app.set('trust proxy', 1);
 
 // Body parsing middleware
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-// Serve uploaded files with proper headers
-app.use("/uploads", (req, res, next) => {
-  // Set proper headers for audio files
-  if (req.path.match(/\.(mp3|wav|m4a|ogg)$/)) {
-    res.set({
-      'Content-Type': 'audio/mpeg',
-      'Accept-Ranges': 'bytes',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-      'Access-Control-Allow-Headers': 'Range',
-      'Cache-Control': 'public, max-age=3600'
-    });
+// Serve uploaded files (with proper path for production)
+const uploadsPath = process.env.NODE_ENV === 'production' ? '/tmp' : path.join(__dirname, "../uploads");
+app.use("/uploads", express.static(uploadsPath, {
+  maxAge: '1h', // Cache files for 1 hour
+  setHeaders: (res, path) => {
+    if (path.endsWith('.mp3') || path.endsWith('.wav')) {
+      res.setHeader('Content-Type', 'audio/mpeg');
+    }
   }
-  next();
-}, express.static(path.join(__dirname, "../uploads")));
+}));
 
-// Health check endpoint
+// Health check endpoint (important for Render)
 app.get("/health", (req, res) => {
   res.json({
     status: "OK",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV,
+    memory: process.memoryUsage(),
+    version: process.env.npm_package_version || '1.0.0',
+  });
+});
+
+// Render health check
+app.get("/", (req, res) => {
+  res.json({
+    message: "VoxWave API is running",
+    status: "healthy",
+    timestamp: new Date().toISOString(),
   });
 });
 
@@ -68,25 +112,27 @@ app.get("/api/info", async (req, res) => {
 
     res.json({
       name: "VoxWave API",
-      version: "1.0.0",
+      version: process.env.npm_package_version || "1.0.0",
       description: "AI Voice Platform Backend API",
       status: "running",
+      environment: process.env.NODE_ENV,
       services: {
         database: "connected",
         elevenLabs: elevenLabsStatus ? "connected" : "disconnected",
       },
       endpoints: {
         textToSpeech: "/api/tts",
-        speechToSpeech: "/api/speech-to-speech",
+        speechToSpeech: "/api/voice/convert",
         speechToText: "/api/stt",
         voices: "/api/voice",
         health: "/health",
       },
     });
   } catch (error) {
+    console.error("API info error:", error);
     res.status(500).json({
       name: "VoxWave API",
-      version: "1.0.0",
+      version: process.env.npm_package_version || "1.0.0",
       status: "error",
       error: error.message,
     });
@@ -95,7 +141,6 @@ app.get("/api/info", async (req, res) => {
 
 // API Routes
 app.use("/api/tts", ttsRoutes);
-app.use("/api/speech-to-speech", speechToSpeechRoutes);
 // app.use('/api/voice', voiceRoutes);
 // app.use('/api/stt', sttRoutes);
 
@@ -109,8 +154,6 @@ app.use("*", (req, res) => {
       "GET /api/info",
       "POST /api/tts/generate",
       "GET /api/tts/voices",
-      "POST /api/speech-to-speech/convert",
-      "GET /api/speech-to-speech/info",
       "POST /api/voice/create",
       "POST /api/voice/convert",
       "GET /api/voice/list",
@@ -139,8 +182,17 @@ app.use((error, req, res, next) => {
     });
   }
 
+  // CORS errors
+  if (error.message === 'Not allowed by CORS') {
+    return res.status(403).json({
+      error: "CORS error",
+      message: "Origin not allowed",
+    });
+  }
+
   // Default error response
-  res.status(error.status || 500).json({
+  const statusCode = error.status || error.statusCode || 500;
+  res.status(statusCode).json({
     error: error.name || "Internal Server Error",
     message: error.message || "Something went wrong",
     ...(process.env.NODE_ENV === "development" && { stack: error.stack }),
@@ -170,5 +222,15 @@ const initializeServices = async () => {
     throw error;
   }
 };
+
+// Graceful shutdown handling
+const gracefulShutdown = (signal) => {
+  console.log(`\n📡 Received ${signal}. Starting graceful shutdown...`);
+  
+  process.exit(0);
+};
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
 
 module.exports = { app, initializeServices };
