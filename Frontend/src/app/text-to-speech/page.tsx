@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
-import { Play, Pause, Download, Copy, Volume2, FileText, Settings, Mic, Upload, Loader, AlertCircle, CheckCircle } from 'lucide-react'
+import { Play, Pause, Download, Copy, Volume2, FileText, Settings, Loader, AlertCircle, CheckCircle } from 'lucide-react'
 import { useTheme } from '@/components/ThemeProvider'
 import { ttsApi, type Voice, type TtsResponse, type VoicesResponse } from '@/lib/api'
 

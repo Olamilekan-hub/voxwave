@@ -1,7 +1,6 @@
 import React from 'react'
 import Link from 'next/link'
 import { ArrowRight, Play, Star, Sparkles, Volume2, Mic, FileText, Waves, Users, Zap, Shield, Globe } from 'lucide-react'
-import Image from 'next/image'
 
 export default function LandingPage() {
   return (
