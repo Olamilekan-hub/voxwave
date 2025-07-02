@@ -98,7 +98,7 @@ const SpeechToSpeechPage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const customVoiceInputRef = useRef<HTMLInputElement>(null)
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
   // Load voices on component mount
   useEffect(() => {

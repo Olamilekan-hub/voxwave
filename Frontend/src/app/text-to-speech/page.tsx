@@ -23,7 +23,7 @@ const TextToSpeechPage = () => {
   const [duration, setDuration] = useState(0)
   const audioRef = useRef<HTMLAudioElement>(null)
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
   const languages = [
     { code: 'en', name: 'English', flag: '🇺🇸' },
