@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   Play,
   Pause,
@@ -17,215 +17,258 @@ import {
   Loader,
   CheckCircle,
   Volume2,
+  AlertCircle,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
+import { useAudio } from "@/hooks/useAudio";
+import { useAudioRecorder } from "@/hooks/useAudioRecorder";
+import { audioUtils } from "@/lib/api";
+
+// Updated API functions for STT
+const sttApi = {
+  async transcribeAudio(formData: FormData) {
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    
+    const response = await fetch(`${API_BASE_URL}/api/stt/transcribe`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch {
+        errorData = { message: `HTTP error! status: ${response.status}` };
+      }
+      throw new Error(errorData.message || errorData.error || 'Failed to transcribe audio');
+    }
+
+    return await response.json();
+  },
+
+  async getTranscriptionInfo() {
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    
+    const response = await fetch(`${API_BASE_URL}/api/stt/info`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to get transcription info');
+    }
+    
+    return await response.json();
+  }
+};
 
 const SpeechToTextPage = () => {
   const { theme, mounted } = useTheme();
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcription, setTranscription] = useState("");
   const [selectedLanguage, setSelectedLanguage] = useState("en-US");
   const [includeTimestamps, setIncludeTimestamps] = useState(false);
   const [speakerDiarization, setSpeakerDiarization] = useState(false);
-  const [confidence, setConfidence] = useState(0.95);
-  const [isLiveTranscription, setIsLiveTranscription] = useState(false);
-  const [liveText, setLiveText] = useState("");
+  const [enhanceAudio, setEnhanceAudio] = useState(true);
+  const [confidence, setConfidence] = useState(0);
+  const [transcriptionResult, setTranscriptionResult] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [supportedLanguages, setSupportedLanguages] = useState<any[]>([]);
+  const [isLoadingInfo, setIsLoadingInfo] = useState(true);
 
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const languages = [
-    { code: "en-US", name: "English (US)", flag: "🇺🇸" },
-    { code: "en-GB", name: "English (UK)", flag: "🇬🇧" },
-    { code: "es-ES", name: "Spanish (Spain)", flag: "🇪🇸" },
-    { code: "es-MX", name: "Spanish (Mexico)", flag: "🇲🇽" },
-    { code: "fr-FR", name: "French (France)", flag: "🇫🇷" },
-    { code: "de-DE", name: "German", flag: "🇩🇪" },
-    { code: "it-IT", name: "Italian", flag: "🇮🇹" },
-    { code: "pt-BR", name: "Portuguese (Brazil)", flag: "🇧🇷" },
-    { code: "ja-JP", name: "Japanese", flag: "🇯🇵" },
-    { code: "ko-KR", name: "Korean", flag: "🇰🇷" },
-    { code: "zh-CN", name: "Chinese (Mandarin)", flag: "🇨🇳" },
-    { code: "ar-SA", name: "Arabic", flag: "🇸🇦" },
-  ];
+  // Audio hooks
+  const audio = useAudio(audioUrl);
+  const audioRecorder = useAudioRecorder({
+    audioBitsPerSecond: 128000
+  });
 
-  const mockTranscriptions = [
-    "Welcome to VoxWave, the revolutionary AI voice platform that transforms how we interact with audio content.",
-    "In today's digital world, the ability to convert speech to text has become increasingly important for accessibility and productivity.",
-    "Our advanced speech recognition technology can accurately transcribe multiple languages with high precision and speed.",
-    "Whether you're transcribing meetings, interviews, or creating subtitles, VoxWave provides the tools you need.",
-  ];
+  // Load supported languages and info on mount
+  useEffect(() => {
+    loadTranscriptionInfo();
+  }, []);
+
+  // Handle recorded audio
+  useEffect(() => {
+    if (audioRecorder.audioBlob && audioRecorder.audioUrl) {
+      setUploadedFile(null); // Clear uploaded file when recording
+      setAudioUrl(audioRecorder.audioUrl);
+      clearTranscriptionResults();
+      setError(null);
+    }
+  }, [audioRecorder.audioBlob, audioRecorder.audioUrl]);
+
+  const loadTranscriptionInfo = async () => {
+    try {
+      setIsLoadingInfo(true);
+      const response = await sttApi.getTranscriptionInfo();
+      
+      if (response.success) {
+        setSupportedLanguages(response.data.supportedLanguages);
+      }
+    } catch (error) {
+      console.error('Error loading transcription info:', error);
+      // Fallback languages
+      setSupportedLanguages([
+        { code: "en-US", name: "English (US)", flag: "🇺🇸" },
+        { code: "en-GB", name: "English (UK)", flag: "🇬🇧" },
+        { code: "es-ES", name: "Spanish (Spain)", flag: "🇪🇸" },
+        { code: "fr-FR", name: "French (France)", flag: "🇫🇷" },
+        { code: "de-DE", name: "German", flag: "🇩🇪" },
+      ]);
+    } finally {
+      setIsLoadingInfo(false);
+    }
+  };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file && file.type.startsWith("audio/")) {
+    if (file) {
+      const validation = audioUtils.validateAudioFile(file);
+      if (!validation.valid) {
+        setError(validation.error || 'Invalid file');
+        return;
+      }
+      
       setUploadedFile(file);
-      setRecordedBlob(null);
+      audioRecorder.clearRecording(); // Clear recording when uploading
       const url = URL.createObjectURL(file);
       setAudioUrl(url);
-      setTranscription("");
+      clearTranscriptionResults();
+      setError(null);
     }
   };
 
   const handleDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
+    setIsDragging(false);
+    
     const file = event.dataTransfer.files[0];
-    if (file && file.type.startsWith("audio/")) {
+    if (file) {
+      const validation = audioUtils.validateAudioFile(file);
+      if (!validation.valid) {
+        setError(validation.error || 'Invalid file');
+        return;
+      }
+      
       setUploadedFile(file);
-      setRecordedBlob(null);
+      audioRecorder.clearRecording();
       const url = URL.createObjectURL(file);
       setAudioUrl(url);
-      setTranscription("");
+      clearTranscriptionResults();
+      setError(null);
     }
-  }, []);
+  }, [audioRecorder]);
 
   const handleDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
+    setIsDragging(true);
   }, []);
 
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-
-      const chunks: BlobPart[] = [];
-      mediaRecorder.ondataavailable = (event) => {
-        chunks.push(event.data);
-      };
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: "audio/wav" });
-        setRecordedBlob(blob);
-        setUploadedFile(null);
-        const url = URL.createObjectURL(blob);
-        setAudioUrl(url);
-        setTranscription("");
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-
-      // Start live transcription simulation
-      if (isLiveTranscription) {
-        startLiveTranscription();
-      }
-    } catch (error) {
-      console.error("Error starting recording:", error);
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      setLiveText("");
-      mediaRecorderRef.current.stream
-        .getTracks()
-        .forEach((track) => track.stop());
-    }
-  };
-
-  const startLiveTranscription = () => {
-    const words = mockTranscriptions[0].split(" ");
-    let index = 0;
-
-    const interval = setInterval(() => {
-      if (index < words.length && isRecording) {
-        setLiveText((prev) => prev + (prev ? " " : "") + words[index]);
-        index++;
-      } else {
-        clearInterval(interval);
-      }
-    }, 300);
-  };
+  const handleDragLeave = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    setIsDragging(false);
+  }, []);
 
   const handleTranscribe = async () => {
-    if (!audioUrl) return;
+    if (!audioUrl) {
+      setError('Please upload an audio file or record your voice');
+      return;
+    }
 
     setIsTranscribing(true);
+    setError(null);
 
     try {
-      // Simulate progressive transcription
-      const selectedTranscription =
-        mockTranscriptions[
-          Math.floor(Math.random() * mockTranscriptions.length)
-        ];
-      const words = selectedTranscription.split(" ");
-
-      setTranscription("");
-
-      for (let i = 0; i < words.length; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 150));
-        setTranscription((prev) => prev + (prev ? " " : "") + words[i]);
+      const formData = new FormData();
+      
+      // Add the audio file
+      if (uploadedFile) {
+        formData.append('audio', uploadedFile);
+      } else if (audioRecorder.audioBlob) {
+        formData.append('audio', audioRecorder.audioBlob, 'recorded-audio.webm');
+      } else {
+        throw new Error('No audio file available');
       }
+      
+      // Add transcription options
+      formData.append('language', selectedLanguage);
+      formData.append('includeTimestamps', includeTimestamps.toString());
+      formData.append('speakerDiarization', speakerDiarization.toString());
+      formData.append('enhanceAudio', enhanceAudio.toString());
+      
+      console.log('Transcribing audio with options:', {
+        language: selectedLanguage,
+        includeTimestamps,
+        speakerDiarization,
+        enhanceAudio
+      });
+      
+      const response = await sttApi.transcribeAudio(formData);
+      
+      if (response.success) {
+        setTranscriptionResult(response.data);
+        setTranscription(response.data.transcription);
+        setConfidence(response.data.confidence);
+        setError(null);
+        
+        console.log('Transcription completed successfully');
+      } else {
+        throw new Error('Transcription failed');
+      }
+      
     } catch (error) {
-      console.error("Error transcribing audio:", error);
+      console.error('Error transcribing audio:', error);
+      setError(`Failed to transcribe audio: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsTranscribing(false);
     }
   };
 
-  const handlePlay = () => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-      } else {
-        audioRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
+  const copyTranscription = async () => {
+    try {
+      await navigator.clipboard.writeText(transcription);
+      // Could add a toast notification here
+    } catch (error) {
+      console.error('Failed to copy transcription:', error);
     }
   };
 
-  const copyTranscription = () => {
-    navigator.clipboard.writeText(transcription);
-  };
-
   const downloadTranscription = () => {
+    if (!transcription) return;
+    
     const blob = new Blob([transcription], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "voxwave-transcription.txt";
-    link.click();
-    URL.revokeObjectURL(url);
+    audioUtils.downloadBlob(blob, `voxwave-transcription-${Date.now()}.txt`);
   };
 
-  const formatTranscriptionWithTimestamps = (text: string) => {
-    if (!includeTimestamps) return text;
-
-    const words = text.split(" ");
-    let formatted = "";
-    let timestamp = 0;
-
-    words.forEach((word, index) => {
-      if (index % 10 === 0) {
-        const minutes = Math.floor(timestamp / 60);
-        const seconds = timestamp % 60;
-        formatted += `\n[${minutes.toString().padStart(2, "0")}:${seconds
-          .toString()
-          .padStart(2, "0")}] `;
-        timestamp += 10;
-      }
-      formatted += word + " ";
-    });
-
-    return formatted.trim();
+  const clearTranscriptionResults = () => {
+    setTranscription("");
+    setTranscriptionResult(null);
+    setConfidence(0);
+    setError(null);
   };
 
   const clearAudio = () => {
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+    }
     setUploadedFile(null);
-    setRecordedBlob(null);
     setAudioUrl(null);
-    setTranscription("");
-    setLiveText("");
-    setIsPlaying(false);
+    audioRecorder.clearRecording();
+    clearTranscriptionResults();
+  };
+
+  const clearError = () => {
+    setError(null);
+  };
+
+  // Format duration
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   if (!mounted) {
@@ -321,7 +364,7 @@ const SpeechToTextPage = () => {
               }`}
             >
               <div className="text-2xl font-bold text-green-400">
-                {languages.find((l) => l.code === selectedLanguage)?.flag ||
+                {supportedLanguages.find((l) => l.code === selectedLanguage)?.flag ||
                   "🌐"}
               </div>
               <div
@@ -335,6 +378,26 @@ const SpeechToTextPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Error Banner */}
+      {(error || audio.error || audioRecorder.error) && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <AlertCircle className="w-5 h-5 text-red-400" />
+              <span className="text-red-400">
+                {error || audio.error || audioRecorder.error}
+              </span>
+            </div>
+            <button
+              onClick={clearError}
+              className="text-red-400 hover:text-red-300 transition-colors"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid lg:grid-cols-3 gap-8">
@@ -356,8 +419,11 @@ const SpeechToTextPage = () => {
                   <div
                     onDrop={handleDrop}
                     onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
                     className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
-                      theme === "dark"
+                      isDragging 
+                        ? 'border-green-500 bg-green-500/10' 
+                        : theme === "dark"
                         ? "border-gray-600 hover:border-green-500 bg-gray-800/50"
                         : "border-gray-300 hover:border-green-500 bg-gray-50"
                     }`}
@@ -395,87 +461,85 @@ const SpeechToTextPage = () => {
 
                   {/* Voice Recording */}
                   <div className="text-center">
-                    <button
-                      onClick={isRecording ? stopRecording : startRecording}
-                      className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${
-                        isRecording
-                          ? "bg-red-500 hover:bg-red-600 animate-pulse"
-                          : "bg-gradient-to-r from-green-400 to-green-600 hover:shadow-lg hover:shadow-green-500/25"
-                      }`}
-                    >
-                      {isRecording ? (
-                        <MicOff className="w-8 h-8 text-white" />
-                      ) : (
-                        <Mic className="w-8 h-8 text-black" />
-                      )}
-                    </button>
-                    <p
-                      className={`mt-4 ${
-                        theme === "dark" ? "text-gray-400" : "text-gray-600"
-                      }`}
-                    >
-                      {isRecording
-                        ? "Click to stop recording"
-                        : "Click to start recording"}
-                    </p>
-
-                    {/* Live Transcription */}
-                    {isRecording && isLiveTranscription && (
-                      <div
-                        className={`mt-4 p-4 rounded-xl ${
-                          theme === "dark" ? "bg-gray-800" : "bg-gray-100"
-                        }`}
-                      >
-                        <div className="flex items-center mb-2">
-                          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse mr-2"></div>
-                          <span className="text-sm font-medium">
-                            Live Transcription
-                          </span>
-                        </div>
-                        <p
-                          className={`text-sm ${
-                            theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    {!audioRecorder.isSupported ? (
+                      <div className="text-red-400 text-sm mb-4">
+                        Audio recording is not supported in your browser
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          onClick={audioRecorder.isRecording ? audioRecorder.stopRecording : audioRecorder.startRecording}
+                          disabled={!audioRecorder.isSupported}
+                          className={`w-20 h-20 rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                            audioRecorder.isRecording
+                              ? "bg-red-500 hover:bg-red-600 animate-pulse"
+                              : "bg-gradient-to-r from-green-400 to-green-600 hover:shadow-lg hover:shadow-green-500/25"
                           }`}
                         >
-                          {liveText || "Listening..."}
+                          {audioRecorder.isRecording ? (
+                            <MicOff className="w-8 h-8 text-white" />
+                          ) : (
+                            <Mic className="w-8 h-8 text-black" />
+                          )}
+                        </button>
+                        
+                        <p
+                          className={`mt-4 ${
+                            theme === "dark" ? "text-gray-400" : "text-gray-600"
+                          }`}
+                        >
+                          {audioRecorder.isRecording ? (
+                            <span className="flex items-center justify-center space-x-2">
+                              <Clock className="w-4 h-4" />
+                              <span>Recording: {formatDuration(audioRecorder.duration)}</span>
+                            </span>
+                          ) : (
+                            "Click to start recording"
+                          )}
                         </p>
-                      </div>
+                      </>
                     )}
                   </div>
                 </div>
               ) : (
                 /* Audio Player */
                 <div
-                  className={`p-4 rounded-xl ${
+                  className={`p-6 rounded-xl ${
                     theme === "dark" ? "bg-gray-800" : "bg-gray-100"
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-3">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center space-x-4">
                       <button
-                        onClick={handlePlay}
-                        className="w-12 h-12 bg-gradient-to-r from-green-400 to-green-600 rounded-full flex items-center justify-center text-black hover:shadow-lg transition-all"
+                        onClick={audio.play}
+                        disabled={!audio.canPlay || audio.isLoading}
+                        className="w-14 h-14 bg-gradient-to-r from-green-400 to-green-600 rounded-full flex items-center justify-center text-black hover:shadow-lg transition-all disabled:opacity-50"
                       >
-                        {isPlaying ? (
+                        {audio.isLoading ? (
+                          <Loader className="w-6 h-6 animate-spin" />
+                        ) : audio.isPlaying ? (
                           <Pause className="w-6 h-6" />
                         ) : (
                           <Play className="w-6 h-6 ml-1" />
                         )}
                       </button>
                       <div>
-                        <div className="font-medium">Audio File</div>
+                        <div className="font-medium text-lg">Audio File</div>
                         <div
                           className={`text-sm ${
                             theme === "dark" ? "text-gray-400" : "text-gray-600"
                           }`}
                         >
                           {uploadedFile ? uploadedFile.name : "Recorded Audio"}
+                          {audio.duration > 0 && (
+                            <span> • {audioUtils.formatDuration(audio.duration)}</span>
+                          )}
                         </div>
                       </div>
                     </div>
                     <button
                       onClick={clearAudio}
-                      className={`p-2 rounded-lg ${
+                      className={`p-3 rounded-lg ${
                         theme === "dark"
                           ? "bg-gray-700 hover:bg-gray-600"
                           : "bg-gray-200 hover:bg-gray-300"
@@ -484,17 +548,37 @@ const SpeechToTextPage = () => {
                       <Trash2 className="w-5 h-5" />
                     </button>
                   </div>
+                  
+                  {/* Progress Bar */}
+                  {audio.duration > 0 && (
+                    <div className="mb-4">
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={audio.duration > 0 ? (audio.currentTime / audio.duration) * 100 : 0}
+                        onChange={(e) => audio.seek((parseFloat(e.target.value) / 100) * audio.duration)}
+                        className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-green-500"
+                      />
+                      <div className="flex justify-between text-sm text-gray-500 mt-1">
+                        <span>{audioUtils.formatDuration(audio.currentTime)}</span>
+                        <span>{audioUtils.formatDuration(audio.duration)}</span>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Waveform Visualization */}
-                  <div className="h-16 bg-gradient-to-r from-green-400/20 to-green-600/20 rounded-lg flex items-center justify-center">
+                  <div className="h-20 bg-gradient-to-r from-green-400/20 to-green-600/20 rounded-lg flex items-center justify-center">
                     <div className="flex items-center space-x-1">
-                      {Array.from({ length: 50 }).map((_, i) => (
+                      {Array.from({ length: 40 }).map((_, i) => (
                         <div
                           key={i}
-                          className="w-1 bg-green-400 rounded-full"
-                          style={{
-                            height: `${Math.random() * 40 + 8}px`,
-                            opacity: isPlaying ? 0.8 : 0.3,
+                          className={`w-1 bg-green-400 rounded-full transition-all duration-75 ${
+                            audio.isPlaying ? 'animate-pulse' : ''
+                          }`}
+                          style={{ 
+                            height: `${Math.random() * 50 + 10}px`,
+                            opacity: audio.isPlaying ? 0.8 : 0.4
                           }}
                         />
                       ))}
@@ -531,6 +615,7 @@ const SpeechToTextPage = () => {
                           ? "bg-gray-800 hover:bg-gray-700"
                           : "bg-gray-100 hover:bg-gray-200"
                       } transition-colors`}
+                      title="Copy transcription"
                     >
                       <Copy className="w-5 h-5" />
                     </button>
@@ -541,6 +626,7 @@ const SpeechToTextPage = () => {
                           ? "bg-gray-800 hover:bg-gray-700"
                           : "bg-gray-100 hover:bg-gray-200"
                       } transition-colors`}
+                      title="Download transcription"
                     >
                       <Download className="w-5 h-5" />
                     </button>
@@ -575,26 +661,33 @@ const SpeechToTextPage = () => {
                         theme === "dark" ? "text-gray-300" : "text-gray-700"
                       } leading-relaxed whitespace-pre-wrap`}
                     >
-                      {formatTranscriptionWithTimestamps(transcription)}
+                      {transcription}
                     </div>
 
-                    {/* Confidence Indicator */}
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-300">
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle className="w-5 h-5 text-green-400" />
-                        <span className="text-sm font-medium">
-                          Transcription Complete
-                        </span>
+                    {/* Result Info */}
+                    {transcriptionResult && (
+                      <div className="flex items-center justify-between pt-4 border-t border-gray-300">
+                        <div className="flex items-center space-x-2">
+                          <CheckCircle className="w-5 h-5 text-green-400" />
+                          <span className="text-sm font-medium">
+                            Transcription Complete
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-4 text-sm text-gray-400">
+                          <span>
+                            Confidence: {Math.round(confidence * 100)}%
+                          </span>
+                          <span>
+                            Words: {transcriptionResult.wordCount || 0}
+                          </span>
+                          {transcriptionResult.duration && (
+                            <span>
+                              Duration: {audioUtils.formatDuration(transcriptionResult.duration)}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-400">
-                          Confidence:
-                        </span>
-                        <span className="text-sm font-medium text-green-400">
-                          {Math.round(confidence * 100)}%
-                        </span>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center justify-center h-32">
@@ -609,12 +702,6 @@ const SpeechToTextPage = () => {
                   </div>
                 )}
               </div>
-
-              <audio
-                ref={audioRef}
-                src={audioUrl || undefined}
-                onEnded={() => setIsPlaying(false)}
-              />
             </div>
           </div>
 
@@ -632,17 +719,22 @@ const SpeechToTextPage = () => {
               <select
                 value={selectedLanguage}
                 onChange={(e) => setSelectedLanguage(e.target.value)}
+                disabled={isLoadingInfo}
                 className={`w-full p-3 rounded-xl border-2 ${
                   theme === "dark"
                     ? "bg-gray-800 border-gray-700 text-white"
                     : "bg-gray-50 border-gray-200 text-gray-900"
-                } focus:border-green-500 focus:outline-none`}
+                } focus:border-green-500 focus:outline-none disabled:opacity-50`}
               >
-                {languages.map((lang) => (
-                  <option key={lang.code} value={lang.code}>
-                    {lang.flag} {lang.name}
-                  </option>
-                ))}
+                {isLoadingInfo ? (
+                  <option>Loading languages...</option>
+                ) : (
+                  supportedLanguages.map((lang) => (
+                    <option key={lang.code} value={lang.code}>
+                      {lang.flag} {lang.name}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
 
@@ -706,18 +798,18 @@ const SpeechToTextPage = () => {
                   <div className="flex items-center space-x-2">
                     <Volume2 className="w-4 h-4" />
                     <label className="text-sm font-medium">
-                      Live Transcription
+                      Enhance Audio
                     </label>
                   </div>
                   <button
-                    onClick={() => setIsLiveTranscription(!isLiveTranscription)}
+                    onClick={() => setEnhanceAudio(!enhanceAudio)}
                     className={`w-12 h-6 rounded-full transition-colors ${
-                      isLiveTranscription ? "bg-green-500" : "bg-gray-300"
+                      enhanceAudio ? "bg-green-500" : "bg-gray-300"
                     }`}
                   >
                     <div
                       className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                        isLiveTranscription ? "translate-x-6" : "translate-x-1"
+                        enhanceAudio ? "translate-x-6" : "translate-x-1"
                       }`}
                     />
                   </button>
@@ -744,54 +836,18 @@ const SpeechToTextPage = () => {
               )}
             </button>
 
-            {/* Quick Actions */}
-            <div
-              className={`p-6 rounded-2xl border-2 ${
-                theme === "dark"
-                  ? "bg-gray-900 border-gray-800"
-                  : "bg-white border-gray-200"
-              }`}
-            >
-              <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  className={`p-3 rounded-lg text-sm font-medium transition-colors ${
-                    theme === "dark"
-                      ? "bg-gray-800 hover:bg-gray-700"
-                      : "bg-gray-100 hover:bg-gray-200"
-                  }`}
-                >
-                  Meeting Notes
-                </button>
-                <button
-                  className={`p-3 rounded-lg text-sm font-medium transition-colors ${
-                    theme === "dark"
-                      ? "bg-gray-800 hover:bg-gray-700"
-                      : "bg-gray-100 hover:bg-gray-200"
-                  }`}
-                >
-                  Interview
-                </button>
-                <button
-                  className={`p-3 rounded-lg text-sm font-medium transition-colors ${
-                    theme === "dark"
-                      ? "bg-gray-800 hover:bg-gray-700"
-                      : "bg-gray-100 hover:bg-gray-200"
-                  }`}
-                >
-                  Lecture
-                </button>
-                <button
-                  className={`p-3 rounded-lg text-sm font-medium transition-colors ${
-                    theme === "dark"
-                      ? "bg-gray-800 hover:bg-gray-700"
-                      : "bg-gray-100 hover:bg-gray-200"
-                  }`}
-                >
-                  Podcast
-                </button>
+            {/* Success Message */}
+            {transcriptionResult && (
+              <div className="bg-green-500/10 border border-green-500/50 rounded-xl p-4 flex items-center space-x-3">
+                <CheckCircle className="w-5 h-5 text-green-400" />
+                <div className="text-green-400 text-sm">
+                  <div>Transcription completed!</div>
+                  <div className="text-xs text-green-400/70">
+                    {transcriptionResult.wordCount} words • {Math.round(confidence * 100)}% confidence
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

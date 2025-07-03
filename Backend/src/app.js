@@ -169,7 +169,7 @@ app.get("/api/info", async (req, res) => {
 // API Routes
 app.use("/api/tts", ttsRoutes);
 app.use('/api/voice', voiceRoutes);
-// app.use('/api/stt', sttRoutes);
+app.use('/api/stt', sttRoutes);
 
 // 404 Handler
 app.use("*", (req, res) => {

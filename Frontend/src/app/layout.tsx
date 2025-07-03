@@ -150,7 +150,7 @@ export default function RootLayout({
             <Navbar />
             
             {/* Main content */}
-            <main className="flex-1 relative z-10">
+            <main className="flex-1 relative z-10 w-[100vw]">
               {children}
             </main>
             

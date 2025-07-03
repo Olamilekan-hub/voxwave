@@ -13,6 +13,7 @@ import {
   Mic,
   ArrowRight,
   Sparkles,
+  Users,
   Zap,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
@@ -55,6 +56,12 @@ const Navbar = () => {
       href: "/speech-to-text",
       icon: Sparkles,
       description: "Transcribe speech accurately",
+    },
+    {
+      name: "Voice Studio",
+      href: "/voice-studio",
+      icon: Users,
+      description: "Create custom AI voices",
     },
   ];
 

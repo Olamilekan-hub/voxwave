@@ -551,11 +551,206 @@ const getVoiceQuota = async (req, res) => {
   }
 };
 
+const convertSpeechEnhanced = async (req, res) => {
+  let uploadedFile = null;
+  
+  try {
+    const { voiceId, options = {}, enhanceAudio = true } = req.body;
+    uploadedFile = req.file;
+    
+    console.log('🔄 Starting enhanced speech conversion...');
+    console.log('Voice ID:', voiceId);
+    console.log('Enhancement enabled:', enhanceAudio);
+    
+    // Validation
+    if (!uploadedFile) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing audio file',
+        message: 'Please upload an audio file'
+      });
+    }
+    
+    if (!voiceId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing voice ID',
+        message: 'Please select a target voice'
+      });
+    }
+    
+    // Determine actual ElevenLabs voice ID
+    let actualVoiceId = voiceId;
+    let isCustomVoice = false;
+    
+    const customVoiceResult = await query(
+      'SELECT elevenlabs_voice_id, name FROM voices WHERE voice_id = $1',
+      [voiceId]
+    );
+    
+    if (customVoiceResult.rows.length > 0) {
+      actualVoiceId = customVoiceResult.rows[0].elevenlabs_voice_id;
+      isCustomVoice = true;
+      console.log(`🎭 Using custom voice: ${customVoiceResult.rows[0].name} (${actualVoiceId})`);
+    }
+    
+    let processedFilePath = uploadedFile.path;
+    let audioMetadata = null;
+    
+    // Enhanced audio processing
+    if (enhanceAudio) {
+      console.log('🔧 Processing audio for better quality...');
+      try {
+        const { AudioProcessor } = require('../middleware/audioProcessor');
+        
+        // Get original audio metadata
+        audioMetadata = await AudioProcessor.getAudioMetadata(uploadedFile.path);
+        console.log(`📊 Original audio: ${audioMetadata.duration.toFixed(2)}s, ${audioMetadata.sampleRate}Hz`);
+        
+        // Process audio for voice conversion
+        const processedResult = await AudioProcessor.processForVoiceCloning(uploadedFile.path, {
+          normalize: true,
+          trimSilence: true,
+          optimize: true
+        });
+        
+        processedFilePath = processedResult.processedPath;
+        audioMetadata = processedResult.metadata;
+        
+        console.log(`✅ Audio enhanced: ${audioMetadata.duration.toFixed(2)}s, improved quality`);
+      } catch (error) {
+        console.warn('⚠️ Audio enhancement failed, using original file:', error.message);
+        // Continue with original file if enhancement fails
+      }
+    }
+    
+    // Parse conversion options
+    const conversionOptions = {
+      model_id: options.model_id || 'eleven_english_sts_v2',
+      voice_settings: {
+        stability: parseFloat(options.stability) || 0.5,
+        similarity_boost: parseFloat(options.similarity_boost) || 0.8,
+        style: parseFloat(options.style) || 0.0,
+        use_speaker_boost: options.use_speaker_boost !== false
+      }
+    };
+    
+    console.log('🔄 Converting speech with ElevenLabs...');
+    
+    // Convert speech using ElevenLabs
+    const audioBuffer = await ElevenLabsService.speechToSpeech(
+      processedFilePath, 
+      actualVoiceId, 
+      conversionOptions
+    );
+    
+    // Generate unique filename for converted audio
+    const fileId = uuidv4();
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `sts_enhanced_${timestamp}_${fileId}.mp3`;
+    
+    // Save converted audio file
+    const filePath = await saveGeneratedAudio(audioBuffer, filename);
+    const publicUrl = `/uploads/generated/${filename}`;
+    
+    // Get original file stats
+    const originalFileStats = fs.statSync(uploadedFile.path);
+    
+    // Save conversion record to database
+    const audioRecord = await query(
+      `INSERT INTO audio_files 
+       (file_id, file_path, file_type, file_size, voice_used, original_text, processing_type, metadata) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+       RETURNING *`,
+      [
+        fileId,
+        filePath,
+        'audio/mpeg',
+        audioBuffer.length,
+        voiceId,
+        `Enhanced speech conversion from ${uploadedFile.originalname}`,
+        'speech-to-speech-enhanced',
+        JSON.stringify({
+          originalFile: uploadedFile.originalname,
+          originalSize: originalFileStats.size,
+          conversionOptions,
+          voiceUsed: actualVoiceId,
+          originalVoiceId: voiceId,
+          isCustomVoice: isCustomVoice,
+          enhanceAudio,
+          audioMetadata,
+          processingSteps: enhanceAudio ? ['normalize', 'trim_silence', 'optimize'] : ['none'],
+          processedAt: new Date().toISOString()
+        })
+      ]
+    );
+    
+    // Update usage statistics
+    await updateUsageStats('audio_files_generated', 1);
+    await updateUsageStats('api_calls_made', 1);
+    
+    // Clean up processed file if different from original
+    if (processedFilePath !== uploadedFile.path) {
+      try {
+        fs.unlinkSync(processedFilePath);
+      } catch (error) {
+        console.warn('Failed to cleanup processed file:', error.message);
+      }
+    }
+    
+    // Clean up uploaded temporary file
+    cleanupFiles([uploadedFile]);
+    
+    console.log(`✅ Enhanced speech conversion completed: ${filename}`);
+    
+    const response = {
+      success: true,
+      data: {
+        fileId,
+        audioUrl: publicUrl,
+        filename,
+        fileSize: audioBuffer.length,
+        originalFile: uploadedFile.originalname,
+        originalSize: originalFileStats.size,
+        voiceUsed: voiceId,
+        voiceName: isCustomVoice ? customVoiceResult.rows[0].name : voiceId,
+        isCustomVoice: isCustomVoice,
+        conversionOptions,
+        enhancement: {
+          enabled: enhanceAudio,
+          originalDuration: audioMetadata?.duration || 0,
+          improvements: enhanceAudio ? ['noise_reduction', 'silence_removal', 'normalization'] : []
+        },
+        createdAt: new Date().toISOString()
+      },
+      message: `Speech converted successfully using ${isCustomVoice ? 'custom' : 'ElevenLabs'} voice with ${enhanceAudio ? 'enhanced' : 'standard'} processing`
+    };
+    
+    res.json(response);
+    
+  } catch (error) {
+    console.error('❌ Error in enhanced speech conversion:', error.message);
+    
+    // Clean up files in case of error
+    if (uploadedFile) {
+      cleanupFiles([uploadedFile]);
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Enhanced conversion failed',
+      message: error.message,
+      suggestion: 'Try again with standard processing or contact support.'
+    });
+  }
+};
+
 module.exports = {
   createVoice,
   listVoices,
   getVoice,
   deleteVoice,
   convertSpeech,
-  getVoiceQuota
+  getVoiceQuota,
+  convertSpeechEnhanced
 };
