@@ -21,11 +21,11 @@ import {
   TrendingUp,
   Award,
   Headphones,
-  Waveform,
+  // Waveform,
   Cpu,
   Brain,
   Rocket,
-  Lightning
+  // Lightning
 } from 'lucide-react'
 
 // Demo text options for the voice synthesis
