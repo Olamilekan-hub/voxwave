@@ -17,7 +17,7 @@ const { getUploadPath } = require("./middleware/upload");
 
 const app = express();
 
-// Security middleware
+// Security middleware with relaxed CSP for audio
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   contentSecurityPolicy: {
@@ -29,7 +29,7 @@ app.use(helmet({
       connectSrc: ["'self'", "https://api.elevenlabs.io"],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
-      mediaSrc: ["'self'", "blob:"],
+      mediaSrc: ["'self'", "blob:", "data:"],
       frameSrc: ["'none'"],
     },
   },
@@ -38,7 +38,7 @@ app.use(helmet({
 // Logging
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-// CORS configuration
+// CORS configuration - FIXED for audio streaming
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (mobile apps, etc.)
@@ -48,7 +48,7 @@ const corsOptions = {
       process.env.FRONTEND_URL,
       'http://localhost:3000',
       'http://localhost:3001',
-      'https://voxwave.vercel.app', // Add your deployed frontend URLs
+      'https://voxwave.vercel.app',
     ].filter(Boolean);
 
     if (allowedOrigins.includes(origin)) {
@@ -60,7 +60,8 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'Range'],
+  exposedHeaders: ['Content-Length', 'Content-Range', 'Accept-Ranges'],
 };
 
 app.use(cors(corsOptions));
@@ -72,13 +73,39 @@ app.set('trust proxy', 1);
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-// Serve uploaded files (with proper path for production)
+// FIXED: Serve uploaded files with proper headers for audio streaming
 const uploadsPath = process.env.NODE_ENV === 'production' ? '/tmp' : path.join(__dirname, "../uploads");
-app.use("/uploads", express.static(uploadsPath, {
-  maxAge: '1h', // Cache files for 1 hour
-  setHeaders: (res, path) => {
-    if (path.endsWith('.mp3') || path.endsWith('.wav')) {
+
+// Serve generated audio files with proper headers
+app.use("/uploads/generated", express.static(path.join(uploadsPath, "generated"), {
+  maxAge: '1h',
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.mp3') || filePath.endsWith('.wav')) {
       res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+    }
+  }
+}));
+
+// Serve temporary uploaded files
+app.use("/uploads/temp", express.static(path.join(uploadsPath, "temp"), {
+  maxAge: '10m',
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.mp3') || filePath.endsWith('.wav') || filePath.endsWith('.m4a')) {
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Accept-Ranges', 'bytes');
+    }
+  }
+}));
+
+// Serve voice samples
+app.use("/uploads/voices", express.static(path.join(uploadsPath, "voices"), {
+  maxAge: '24h',
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.mp3') || filePath.endsWith('.wav') || filePath.endsWith('.m4a')) {
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Accept-Ranges', 'bytes');
     }
   }
 }));
@@ -141,7 +168,7 @@ app.get("/api/info", async (req, res) => {
 
 // API Routes
 app.use("/api/tts", ttsRoutes);
-// app.use('/api/voice', voiceRoutes);
+app.use('/api/voice', voiceRoutes);
 // app.use('/api/stt', sttRoutes);
 
 // 404 Handler
@@ -226,7 +253,6 @@ const initializeServices = async () => {
 // Graceful shutdown handling
 const gracefulShutdown = (signal) => {
   console.log(`\n📡 Received ${signal}. Starting graceful shutdown...`);
-  
   process.exit(0);
 };
 

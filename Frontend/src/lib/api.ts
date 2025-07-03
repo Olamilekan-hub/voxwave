@@ -80,43 +80,15 @@ export const ttsApi = {
   },
 };
 
-// Speech-to-Speech API functions
-export const speechToSpeechApi = {
-  // Get conversion info and supported formats
-  async getConversionInfo(): Promise<ConversionInfoResponse> {
-    return apiCall('/api/speech-to-speech/info');
-  },
-
-  // Convert speech to speech
-  async convertSpeech(formData: FormData): Promise<SpeechToSpeechResponse> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/speech-to-speech/convert`, {
-        method: 'POST',
-        body: formData, // Don't set Content-Type for FormData
-      });
-
-      if (!response.ok) {
-        let errorData;
-        try {
-          errorData = await response.json();
-        } catch {
-          errorData = { message: `HTTP error! status: ${response.status}` };
-        }
-        throw new Error(errorData.message || errorData.error || 'Failed to convert speech');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Speech conversion failed:', error);
-      throw error;
-    }
-  },
-};
-
-// Voice API functions for custom voice creation
+// Voice API functions - UPDATED for better speech-to-speech handling
 export const voiceApi = {
-  // Create voice clone
-  async createVoice(formData: FormData): Promise<any> {
+  // Get available voices (ElevenLabs + custom)
+  async getVoices(): Promise<VoicesResponse> {
+    return apiCall('/api/voice/list');
+  },
+
+  // Create custom voice clone
+  async createVoice(formData: FormData): Promise<CreateVoiceResponse> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/voice/create`, {
         method: 'POST',
@@ -141,7 +113,7 @@ export const voiceApi = {
   },
 
   // Convert speech to speech
-  async convertSpeech(formData: FormData): Promise<any> {
+  async convertSpeech(formData: FormData): Promise<SpeechToSpeechResponse> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/voice/convert`, {
         method: 'POST',
@@ -165,9 +137,22 @@ export const voiceApi = {
     }
   },
 
-  // List voices
-  async listVoices(): Promise<any> {
-    return apiCall('/api/voice/list');
+  // Get conversion info
+  async getConversionInfo(): Promise<ConversionInfoResponse> {
+    return apiCall('/api/voice/conversion-info');
+  },
+};
+
+// Legacy speech-to-speech API (for backwards compatibility)
+export const speechToSpeechApi = {
+  // Get conversion info and supported formats
+  async getConversionInfo(): Promise<ConversionInfoResponse> {
+    return voiceApi.getConversionInfo();
+  },
+
+  // Convert speech to speech
+  async convertSpeech(formData: FormData): Promise<SpeechToSpeechResponse> {
+    return voiceApi.convertSpeech(formData);
   },
 };
 
@@ -201,7 +186,7 @@ export const sttApi = {
 
 // Health check with timeout
 export const healthApi = {
-  async checkHealth(): Promise<any> {
+  async checkHealth(): Promise<HealthResponse> {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
@@ -225,12 +210,12 @@ export const healthApi = {
     }
   },
 
-  async getApiInfo(): Promise<any> {
+  async getApiInfo(): Promise<ApiInfoResponse> {
     return apiCall('/api/info');
   },
 };
 
-// Audio utility functions
+// Audio utility functions - ENHANCED
 export const audioUtils = {
   // Download audio blob as file
   downloadBlob(blob: Blob, filename: string) {
@@ -249,7 +234,7 @@ export const audioUtils = {
     return new Blob([file], { type: file.type });
   },
 
-  // Validate audio file
+  // Validate audio file - ENHANCED validation
   validateAudioFile(file: File): { valid: boolean; error?: string } {
     const allowedTypes = [
       'audio/mpeg',
@@ -281,6 +266,14 @@ export const audioUtils = {
       };
     }
 
+    const minSize = 1024; // 1KB minimum
+    if (file.size < minSize) {
+      return {
+        valid: false,
+        error: 'File size too small. Please upload a valid audio file.'
+      };
+    }
+
     return { valid: true };
   },
 
@@ -298,10 +291,29 @@ export const audioUtils = {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  },
+
+  // Create audio URL from response
+  async createAudioUrl(audioResponse: Response): Promise<string> {
+    const blob = await audioResponse.blob();
+    return URL.createObjectURL(blob);
+  },
+
+  // Stream audio from URL
+  async streamAudio(url: string): Promise<{ blob: Blob; url: string }> {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch audio: ${response.status}`);
+    }
+    
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    
+    return { blob, url: blobUrl };
   }
 };
 
-// Types for TypeScript
+// Types for TypeScript - UPDATED
 export interface Voice {
   voice_id: string;
   name: string;
@@ -333,6 +345,20 @@ export interface VoicesResponse {
     elevenLabsVoices: Voice[];
     customVoices: Voice[];
     total: number;
+  };
+  message: string;
+}
+
+export interface CreateVoiceResponse {
+  success: boolean;
+  data: {
+    voiceId: string;
+    elevenLabsVoiceId: string;
+    name: string;
+    description: string;
+    samplesCount: number;
+    totalSize: number;
+    createdAt: string;
   };
   message: string;
 }
@@ -407,6 +433,13 @@ export interface HealthResponse {
   timestamp: string;
   uptime: number;
   environment: string;
+  memory: {
+    rss: number;
+    heapTotal: number;
+    heapUsed: number;
+    external: number;
+  };
+  version: string;
 }
 
 export interface ApiInfoResponse {
@@ -414,6 +447,7 @@ export interface ApiInfoResponse {
   version: string;
   description: string;
   status: string;
+  environment: string;
   services: {
     database: string;
     elevenLabs: string;

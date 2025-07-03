@@ -1,12 +1,172 @@
+const express = require('express');
 const { ElevenLabsService } = require('../config/elevenlabs');
 const { query, updateUsageStats } = require('../config/database');
-const { saveGeneratedAudio, cleanupFiles } = require('../middleware/upload');
+const { saveGeneratedAudio, cleanupFiles, uploadAudio, uploadVoice, handleUploadError } = require('../middleware/upload');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
 
+const router = express.Router();
+
+// Get available voices (ElevenLabs + custom voices)
+router.get('/list', async (req, res) => {
+  try {
+    console.log('🎤 Fetching available voices...');
+    
+    // Get voices from ElevenLabs
+    const voicesData = await ElevenLabsService.getVoices();
+    
+    // Also get custom voices from database
+    const customVoicesResult = await query(
+      'SELECT voice_id, name, description, created_at FROM voices ORDER BY created_at DESC'
+    );
+    
+    const response = {
+      success: true,
+      data: {
+        elevenLabsVoices: voicesData.voices || [],
+        customVoices: customVoicesResult.rows,
+        total: (voicesData.voices?.length || 0) + customVoicesResult.rows.length
+      },
+      message: 'Voices fetched successfully'
+    };
+    
+    res.json(response);
+    
+  } catch (error) {
+    console.error('❌ Error fetching voices:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch voices',
+      message: error.message
+    });
+  }
+});
+
+// Create custom voice clone
+router.post('/create', uploadVoice.array('voiceSamples', 5), handleUploadError, async (req, res) => {
+  let uploadedFiles = [];
+  
+  try {
+    const { name, description } = req.body;
+    uploadedFiles = req.files || [];
+    
+    console.log('🎭 Creating custom voice clone...');
+    console.log('Voice name:', name);
+    console.log('Description:', description);
+    console.log('Voice samples:', uploadedFiles.length);
+    
+    // Validation
+    if (!name || !name.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing voice name',
+        message: 'Please provide a name for the voice'
+      });
+    }
+    
+    if (!uploadedFiles || uploadedFiles.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing voice samples',
+        message: 'Please upload at least one voice sample'
+      });
+    }
+
+    if (uploadedFiles.length > 5) {
+      return res.status(400).json({
+        success: false,
+        error: 'Too many files',
+        message: 'Maximum 5 voice samples allowed'
+      });
+    }
+    
+    // Create voice using ElevenLabs
+    const audioFilePaths = uploadedFiles.map(file => file.path);
+    console.log('🔄 Creating voice with ElevenLabs API...');
+    
+    const elevenLabsVoice = await ElevenLabsService.createVoice(
+      name.trim(),
+      description || `Custom voice: ${name}`,
+      audioFilePaths
+    );
+    
+    // Generate unique voice ID for our system
+    const voiceId = uuidv4();
+    
+    // Save voice record to database
+    const voiceRecord = await query(
+      `INSERT INTO voices 
+       (voice_id, elevenlabs_voice_id, name, description, original_file_path, file_size) 
+       VALUES ($1, $2, $3, $4, $5, $6) 
+       RETURNING *`,
+      [
+        voiceId,
+        elevenLabsVoice.voice_id,
+        name.trim(),
+        description || `Custom voice: ${name}`,
+        JSON.stringify(audioFilePaths),
+        uploadedFiles.reduce((total, file) => total + file.size, 0)
+      ]
+    );
+    
+    // Update usage statistics
+    await updateUsageStats('voices_created', 1);
+    await updateUsageStats('api_calls_made', 1);
+    
+    console.log(`✅ Voice created successfully: ${name}`);
+    
+    const response = {
+      success: true,
+      data: {
+        voiceId,
+        elevenLabsVoiceId: elevenLabsVoice.voice_id,
+        name: name.trim(),
+        description: description || `Custom voice: ${name}`,
+        samplesCount: uploadedFiles.length,
+        totalSize: uploadedFiles.reduce((total, file) => total + file.size, 0),
+        createdAt: new Date().toISOString()
+      },
+      message: 'Voice created successfully'
+    };
+    
+    res.json(response);
+    
+  } catch (error) {
+    console.error('❌ Error creating voice:', error.message);
+    
+    // Clean up uploaded files in case of error
+    if (uploadedFiles.length > 0) {
+      cleanupFiles(uploadedFiles);
+    }
+    
+    // Handle specific ElevenLabs errors
+    if (error.message.includes('quota') || error.message.includes('limit')) {
+      return res.status(429).json({
+        success: false,
+        error: 'Rate limit exceeded',
+        message: 'ElevenLabs API quota exceeded. Please try again later.'
+      });
+    }
+    
+    if (error.message.includes('file') || error.message.includes('audio')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid audio files',
+        message: 'Please upload valid audio files (MP3, WAV, M4A, etc.)'
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Voice creation failed',
+      message: error.message
+    });
+  }
+});
+
 // Convert speech to speech using different voice
-const convertSpeech = async (req, res) => {
+router.post('/convert', uploadAudio.single('audio'), handleUploadError, async (req, res) => {
   let uploadedFile = null;
   
   try {
@@ -106,9 +266,6 @@ const convertSpeech = async (req, res) => {
     await updateUsageStats('audio_files_generated', 1);
     await updateUsageStats('api_calls_made', 1);
     
-    // Clean up uploaded temporary file
-    cleanupFiles([uploadedFile]);
-    
     console.log(`✅ Speech converted successfully: ${filename}`);
     
     const response = {
@@ -131,11 +288,6 @@ const convertSpeech = async (req, res) => {
     
   } catch (error) {
     console.error('❌ Error converting speech:', error.message);
-    
-    // Clean up files in case of error
-    if (uploadedFile) {
-      cleanupFiles([uploadedFile]);
-    }
     
     // Handle specific ElevenLabs errors
     if (error.message.includes('voice')) {
@@ -167,11 +319,16 @@ const convertSpeech = async (req, res) => {
       error: 'Speech conversion failed',
       message: error.message
     });
+  } finally {
+    // Clean up uploaded temporary file
+    if (uploadedFile) {
+      cleanupFiles([uploadedFile]);
+    }
   }
-};
+});
 
-// Get supported file formats and limits
-const getConversionInfo = async (req, res) => {
+// Get conversion info and supported formats
+router.get('/conversion-info', async (req, res) => {
   try {
     const info = {
       success: true,
@@ -238,9 +395,6 @@ const getConversionInfo = async (req, res) => {
       message: error.message
     });
   }
-};
+});
 
-module.exports = {
-  convertSpeech,
-  getConversionInfo
-};
+module.exports = router;

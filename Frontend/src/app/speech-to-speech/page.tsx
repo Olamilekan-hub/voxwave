@@ -18,10 +18,13 @@ import {
   CheckCircle,
   FileAudio,
   Plus,
-  X
+  X,
+  Clock
 } from 'lucide-react'
 import { useTheme } from '@/components/ThemeProvider'
 import { ttsApi, speechToSpeechApi, audioUtils } from '@/lib/api'
+import { useAudio } from '@/hooks/useAudio'
+import { useAudioRecorder } from '@/hooks/useAudioRecorder'
 
 // Define types for better TypeScript support
 interface Voice {
@@ -57,10 +60,7 @@ const SpeechToSpeechPage = () => {
   
   // Original audio states
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
-  const [isRecording, setIsRecording] = useState(false)
-  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null)
   const [originalAudioUrl, setOriginalAudioUrl] = useState<string | null>(null)
-  const [isPlayingOriginal, setIsPlayingOriginal] = useState(false)
   
   // Target voice states
   const [selectedVoice, setSelectedVoice] = useState('')
@@ -69,7 +69,6 @@ const SpeechToSpeechPage = () => {
   const [isLoadingVoices, setIsLoadingVoices] = useState(true)
   
   // Custom voice upload states
-  const [isUploadingCustomVoice, setIsUploadingCustomVoice] = useState(false)
   const [customVoiceName, setCustomVoiceName] = useState('')
   const [customVoiceFile, setCustomVoiceFile] = useState<File | null>(null)
   const [showCustomVoiceUpload, setShowCustomVoiceUpload] = useState(false)
@@ -78,7 +77,6 @@ const SpeechToSpeechPage = () => {
   const [isProcessing, setIsProcessing] = useState(false)
   const [convertedAudioUrl, setConvertedAudioUrl] = useState<string | null>(null)
   const [convertedAudioBlob, setConvertedAudioBlob] = useState<Blob | null>(null)
-  const [isPlayingConverted, setIsPlayingConverted] = useState(false)
   const [conversionResult, setConversionResult] = useState<any>(null)
   
   // Settings states
@@ -91,12 +89,18 @@ const SpeechToSpeechPage = () => {
   const [error, setError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   
-  // Audio refs
-  const originalAudioRef = useRef<HTMLAudioElement>(null)
-  const convertedAudioRef = useRef<HTMLAudioElement>(null)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  // File input refs
   const fileInputRef = useRef<HTMLInputElement>(null)
   const customVoiceInputRef = useRef<HTMLInputElement>(null)
+
+  // Audio hooks for playback
+  const originalAudio = useAudio(originalAudioUrl)
+  const convertedAudio = useAudio(convertedAudioUrl)
+  
+  // Audio recorder hook
+  const audioRecorder = useAudioRecorder({
+    audioBitsPerSecond: 128000
+  })
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -104,6 +108,16 @@ const SpeechToSpeechPage = () => {
   useEffect(() => {
     loadVoices()
   }, [])
+
+  // Handle recorded audio
+  useEffect(() => {
+    if (audioRecorder.audioBlob && audioRecorder.audioUrl) {
+      setUploadedFile(null) // Clear uploaded file when recording
+      setOriginalAudioUrl(audioRecorder.audioUrl)
+      clearConversionResults()
+      setError(null)
+    }
+  }, [audioRecorder.audioBlob, audioRecorder.audioUrl])
 
   const loadVoices = async () => {
     try {
@@ -154,7 +168,7 @@ const SpeechToSpeechPage = () => {
       }
       
       setUploadedFile(file)
-      setRecordedBlob(null)
+      audioRecorder.clearRecording() // Clear recording when uploading
       const url = URL.createObjectURL(file)
       setOriginalAudioUrl(url)
       clearConversionResults()
@@ -175,13 +189,13 @@ const SpeechToSpeechPage = () => {
       }
       
       setUploadedFile(file)
-      setRecordedBlob(null)
+      audioRecorder.clearRecording()
       const url = URL.createObjectURL(file)
       setOriginalAudioUrl(url)
       clearConversionResults()
       setError(null)
     }
-  }, [])
+  }, [audioRecorder])
 
   const handleDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault()
@@ -192,43 +206,6 @@ const SpeechToSpeechPage = () => {
     event.preventDefault()
     setIsDragging(false)
   }, [])
-
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream)
-      mediaRecorderRef.current = mediaRecorder
-
-      const chunks: BlobPart[] = []
-      mediaRecorder.ondataavailable = (event) => {
-        chunks.push(event.data)
-      }
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/wav' })
-        setRecordedBlob(blob)
-        setUploadedFile(null)
-        const url = URL.createObjectURL(blob)
-        setOriginalAudioUrl(url)
-        clearConversionResults()
-        setError(null)
-      }
-
-      mediaRecorder.start()
-      setIsRecording(true)
-    } catch (error) {
-      console.error('Error starting recording:', error)
-      setError('Failed to start recording. Please check microphone permissions.')
-    }
-  }
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop()
-      setIsRecording(false)
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop())
-    }
-  }
 
   const handleCustomVoiceUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -292,8 +269,8 @@ const SpeechToSpeechPage = () => {
       // Add the audio file
       if (uploadedFile) {
         formData.append('audio', uploadedFile)
-      } else if (recordedBlob) {
-        formData.append('audio', recordedBlob, 'recorded-audio.wav')
+      } else if (audioRecorder.audioBlob) {
+        formData.append('audio', audioRecorder.audioBlob, 'recorded-audio.webm')
       } else {
         throw new Error('No audio file available')
       }
@@ -352,40 +329,6 @@ const SpeechToSpeechPage = () => {
     }
   }
 
-  const handlePlayOriginal = async () => {
-    if (!originalAudioRef.current) return
-    
-    try {
-      if (isPlayingOriginal) {
-        originalAudioRef.current.pause()
-        setIsPlayingOriginal(false)
-      } else {
-        await originalAudioRef.current.play()
-        setIsPlayingOriginal(true)
-      }
-    } catch (error) {
-      console.error('Error playing original audio:', error)
-      setError('Failed to play original audio')
-    }
-  }
-
-  const handlePlayConverted = async () => {
-    if (!convertedAudioRef.current) return
-    
-    try {
-      if (isPlayingConverted) {
-        convertedAudioRef.current.pause()
-        setIsPlayingConverted(false)
-      } else {
-        await convertedAudioRef.current.play()
-        setIsPlayingConverted(true)
-      }
-    } catch (error) {
-      console.error('Error playing converted audio:', error)
-      setError('Failed to play converted audio')
-    }
-  }
-
   const handleDownload = () => {
     if (!convertedAudioBlob || !conversionResult) return
     
@@ -401,17 +344,21 @@ const SpeechToSpeechPage = () => {
   }
 
   const clearConversionResults = () => {
+    if (convertedAudioUrl) {
+      URL.revokeObjectURL(convertedAudioUrl)
+    }
     setConvertedAudioUrl(null)
     setConvertedAudioBlob(null)
     setConversionResult(null)
-    setIsPlayingConverted(false)
   }
 
   const clearAudio = () => {
+    if (originalAudioUrl) {
+      URL.revokeObjectURL(originalAudioUrl)
+    }
     setUploadedFile(null)
-    setRecordedBlob(null)
     setOriginalAudioUrl(null)
-    setIsPlayingOriginal(false)
+    audioRecorder.clearRecording()
     clearConversionResults()
     setError(null)
   }
@@ -432,6 +379,13 @@ const SpeechToSpeechPage = () => {
       }))
     ]
     return allVoices
+  }
+
+  // Helper function to format duration
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
   if (!mounted) {
@@ -464,7 +418,8 @@ const SpeechToSpeechPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className={`p-4 rounded-xl ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
               <div className="text-2xl font-bold text-green-400">
-                {uploadedFile ? audioUtils.formatFileSize(uploadedFile.size) : '0 MB'}
+                {uploadedFile ? audioUtils.formatFileSize(uploadedFile.size) : 
+                 audioRecorder.audioBlob ? audioUtils.formatFileSize(audioRecorder.audioBlob.size) : '0 MB'}
               </div>
               <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>File Size</div>
             </div>
@@ -485,12 +440,14 @@ const SpeechToSpeechPage = () => {
       </div>
 
       {/* Error Banner */}
-      {error && (
+      {(error || originalAudio.error || convertedAudio.error || audioRecorder.error) && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4 flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <AlertCircle className="w-5 h-5 text-red-400" />
-              <span className="text-red-400">{error}</span>
+              <span className="text-red-400">
+                {error || originalAudio.error || convertedAudio.error || audioRecorder.error}
+              </span>
             </div>
             <button
               onClick={clearError}
@@ -546,23 +503,40 @@ const SpeechToSpeechPage = () => {
 
                   {/* Voice Recording */}
                   <div className="text-center">
-                    <button
-                      onClick={isRecording ? stopRecording : startRecording}
-                      className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${
-                        isRecording
-                          ? 'bg-red-500 hover:bg-red-600 animate-pulse'
-                          : 'bg-gradient-to-r from-green-400 to-green-600 hover:shadow-lg hover:shadow-green-500/25'
-                      }`}
-                    >
-                      {isRecording ? (
-                        <MicOff className="w-8 h-8 text-white" />
-                      ) : (
-                        <Mic className="w-8 h-8 text-black" />
-                      )}
-                    </button>
-                    <p className={`mt-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                      {isRecording ? 'Click to stop recording' : 'Click to start recording'}
-                    </p>
+                    {!audioRecorder.isSupported ? (
+                      <div className="text-red-400 text-sm mb-4">
+                        Audio recording is not supported in your browser
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          onClick={audioRecorder.isRecording ? audioRecorder.stopRecording : audioRecorder.startRecording}
+                          disabled={!audioRecorder.isSupported}
+                          className={`w-20 h-20 rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                            audioRecorder.isRecording
+                              ? 'bg-red-500 hover:bg-red-600 animate-pulse'
+                              : 'bg-gradient-to-r from-green-400 to-green-600 hover:shadow-lg hover:shadow-green-500/25'
+                          }`}
+                        >
+                          {audioRecorder.isRecording ? (
+                            <MicOff className="w-8 h-8 text-white" />
+                          ) : (
+                            <Mic className="w-8 h-8 text-black" />
+                          )}
+                        </button>
+                        
+                        <p className={`mt-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                          {audioRecorder.isRecording ? (
+                            <span className="flex items-center justify-center space-x-2">
+                              <Clock className="w-4 h-4" />
+                              <span>Recording: {formatDuration(audioRecorder.duration)}</span>
+                            </span>
+                          ) : (
+                            'Click to start recording'
+                          )}
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -571,15 +545,25 @@ const SpeechToSpeechPage = () => {
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center space-x-4">
                       <button
-                        onClick={handlePlayOriginal}
-                        className="w-14 h-14 bg-gradient-to-r from-green-400 to-green-600 rounded-full flex items-center justify-center text-black hover:shadow-lg transition-all"
+                        onClick={originalAudio.play}
+                        disabled={!originalAudio.canPlay || originalAudio.isLoading}
+                        className="w-14 h-14 bg-gradient-to-r from-green-400 to-green-600 rounded-full flex items-center justify-center text-black hover:shadow-lg transition-all disabled:opacity-50"
                       >
-                        {isPlayingOriginal ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-1" />}
+                        {originalAudio.isLoading ? (
+                          <Loader className="w-6 h-6 animate-spin" />
+                        ) : originalAudio.isPlaying ? (
+                          <Pause className="w-6 h-6" />
+                        ) : (
+                          <Play className="w-6 h-6 ml-1" />
+                        )}
                       </button>
                       <div>
                         <div className="font-medium text-lg">Original Audio</div>
                         <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                           {uploadedFile ? uploadedFile.name : 'Recorded Audio'}
+                          {originalAudio.duration > 0 && (
+                            <span> • {audioUtils.formatDuration(originalAudio.duration)}</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -591,6 +575,24 @@ const SpeechToSpeechPage = () => {
                     </button>
                   </div>
                   
+                  {/* Progress Bar */}
+                  {originalAudio.duration > 0 && (
+                    <div className="mb-4">
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={originalAudio.duration > 0 ? (originalAudio.currentTime / originalAudio.duration) * 100 : 0}
+                        onChange={(e) => originalAudio.seek((parseFloat(e.target.value) / 100) * originalAudio.duration)}
+                        className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-green-500"
+                      />
+                      <div className="flex justify-between text-sm text-gray-500 mt-1">
+                        <span>{audioUtils.formatDuration(originalAudio.currentTime)}</span>
+                        <span>{audioUtils.formatDuration(originalAudio.duration)}</span>
+                      </div>
+                    </div>
+                  )}
+                  
                   {/* Waveform Visualization */}
                   <div className="h-20 bg-gradient-to-r from-blue-400/20 to-blue-600/20 rounded-lg flex items-center justify-center">
                     <div className="flex items-center space-x-1">
@@ -598,11 +600,11 @@ const SpeechToSpeechPage = () => {
                         <div
                           key={i}
                           className={`w-1 bg-blue-400 rounded-full transition-all duration-75 ${
-                            isPlayingOriginal ? 'animate-pulse' : ''
+                            originalAudio.isPlaying ? 'animate-pulse' : ''
                           }`}
                           style={{ 
                             height: `${Math.random() * 50 + 10}px`,
-                            opacity: isPlayingOriginal ? 0.8 : 0.4
+                            opacity: originalAudio.isPlaying ? 0.8 : 0.4
                           }}
                         />
                       ))}
@@ -629,15 +631,25 @@ const SpeechToSpeechPage = () => {
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center space-x-4">
                       <button
-                        onClick={handlePlayConverted}
-                        className="w-14 h-14 bg-gradient-to-r from-green-400 to-green-600 rounded-full flex items-center justify-center text-black hover:shadow-lg transition-all"
+                        onClick={convertedAudio.play}
+                        disabled={!convertedAudio.canPlay || convertedAudio.isLoading}
+                        className="w-14 h-14 bg-gradient-to-r from-green-400 to-green-600 rounded-full flex items-center justify-center text-black hover:shadow-lg transition-all disabled:opacity-50"
                       >
-                        {isPlayingConverted ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-1" />}
+                        {convertedAudio.isLoading ? (
+                          <Loader className="w-6 h-6 animate-spin" />
+                        ) : convertedAudio.isPlaying ? (
+                          <Pause className="w-6 h-6" />
+                        ) : (
+                          <Play className="w-6 h-6 ml-1" />
+                        )}
                       </button>
                       <div>
                         <div className="font-medium text-lg">Converted Speech</div>
                         <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                           Voice: {getAllVoices().find(v => v.voice_id === selectedVoice)?.name}
+                          {convertedAudio.duration > 0 && (
+                            <span> • {audioUtils.formatDuration(convertedAudio.duration)}</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -656,6 +668,24 @@ const SpeechToSpeechPage = () => {
                     </div>
                   </div>
                   
+                  {/* Progress Bar */}
+                  {convertedAudio.duration > 0 && (
+                    <div className="mb-4">
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={convertedAudio.duration > 0 ? (convertedAudio.currentTime / convertedAudio.duration) * 100 : 0}
+                        onChange={(e) => convertedAudio.seek((parseFloat(e.target.value) / 100) * convertedAudio.duration)}
+                        className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-green-500"
+                      />
+                      <div className="flex justify-between text-sm text-gray-500 mt-1">
+                        <span>{audioUtils.formatDuration(convertedAudio.currentTime)}</span>
+                        <span>{audioUtils.formatDuration(convertedAudio.duration)}</span>
+                      </div>
+                    </div>
+                  )}
+                  
                   {/* Converted Waveform */}
                   <div className="h-20 bg-gradient-to-r from-green-400/20 to-green-600/20 rounded-lg flex items-center justify-center">
                     <div className="flex items-center space-x-1">
@@ -663,36 +693,22 @@ const SpeechToSpeechPage = () => {
                         <div
                           key={i}
                           className={`w-1 bg-green-400 rounded-full transition-all duration-75 ${
-                            isPlayingConverted ? 'animate-pulse' : ''
+                            convertedAudio.isPlaying ? 'animate-pulse' : ''
                           }`}
                           style={{ 
                             height: `${Math.random() * 50 + 10}px`,
-                            opacity: isPlayingConverted ? 0.8 : 0.4
+                            opacity: convertedAudio.isPlaying ? 0.8 : 0.4
                           }}
                         />
                       ))}
                     </div>
                   </div>
                 </div>
-
-                {/* Hidden Audio Elements */}
-                <audio 
-                  ref={originalAudioRef} 
-                  src={originalAudioUrl || undefined} 
-                  onEnded={() => setIsPlayingOriginal(false)}
-                  style={{ display: 'none' }}
-                />
-                <audio 
-                  ref={convertedAudioRef} 
-                  src={convertedAudioUrl} 
-                  onEnded={() => setIsPlayingConverted(false)}
-                  style={{ display: 'none' }}
-                />
               </div>
             )}
           </div>
 
-          {/* Settings Sidebar */}
+          {/* Settings Sidebar - Will continue in next part... */}
           <div className="space-y-6">
             
             {/* Voice Selection */}
