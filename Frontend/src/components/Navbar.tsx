@@ -73,7 +73,6 @@ const Navbar = () => {
     visible: {
       y: 0,
       opacity: 1,
-      transition: { duration: 0.6, ease: "easeOut" },
     },
   };
 
@@ -122,6 +121,7 @@ const Navbar = () => {
       variants={navVariants}
       initial="hidden"
       animate="visible"
+      transition={{ duration: 0.6, ease: "easeOut" }}
     >
       <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
