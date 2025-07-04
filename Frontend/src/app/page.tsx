@@ -1,21 +1,21 @@
-'use client'
+"use client";
 
-import React, { useState, useEffect, useRef } from 'react'
-import Link from 'next/link'
-import { motion, useScroll, useTransform, useInView } from 'framer-motion'
-import { 
-  ArrowRight, 
-  Play, 
+import React, { useState, useEffect, useRef } from "react";
+import Link from "next/link";
+import { motion, useScroll, useTransform, useInView } from "framer-motion";
+import {
+  ArrowRight,
+  Play,
   Pause,
-  Star, 
-  Sparkles, 
-  Volume2, 
-  Mic, 
-  FileText, 
-  Waves, 
-  Zap, 
-  Shield, 
-  Globe, 
+  Star,
+  Sparkles,
+  Volume2,
+  Mic,
+  FileText,
+  Waves,
+  Zap,
+  Shield,
+  Globe,
   Users,
   CheckCircle,
   TrendingUp,
@@ -26,91 +26,118 @@ import {
   Brain,
   Rocket,
   // Lightning
-} from 'lucide-react'
+} from "lucide-react";
 
 // Demo text options for the voice synthesis
 const demoTexts = [
   "Welcome to the future of voice technology with VoxWave AI.",
   "Transform any text into natural, human-like speech instantly.",
   "Experience the power of artificial intelligence in voice generation.",
-  "Create custom voices that sound incredibly realistic and engaging."
-]
+  "Create custom voices that sound incredibly realistic and engaging.",
+];
 
 // Voice samples data
 const voiceSamples = [
-  { id: 'sarah', name: 'Sarah', description: 'Professional & Clear', accent: 'American' },
-  { id: 'david', name: 'David', description: 'Warm & Friendly', accent: 'British' },
-  { id: 'emma', name: 'Emma', description: 'Energetic & Young', accent: 'Australian' },
-  { id: 'james', name: 'James', description: 'Authoritative & Deep', accent: 'Canadian' }
-]
+  {
+    id: "sarah",
+    name: "Sarah",
+    description: "Professional & Clear",
+    accent: "American",
+  },
+  {
+    id: "david",
+    name: "David",
+    description: "Warm & Friendly",
+    accent: "British",
+  },
+  {
+    id: "emma",
+    name: "Emma",
+    description: "Energetic & Young",
+    accent: "Australian",
+  },
+  {
+    id: "james",
+    name: "James",
+    description: "Authoritative & Deep",
+    accent: "Canadian",
+  },
+];
 
 // Trust indicators data
 const trustIndicators = [
-  { metric: '50M+', label: 'Voices Generated', icon: Volume2 },
-  { metric: '99.9%', label: 'Uptime', icon: Zap },
-  { metric: '150+', label: 'Languages', icon: Globe },
-  { metric: '500K+', label: 'Happy Users', icon: Users }
-]
+  { metric: "50M+", label: "Voices Generated", icon: Volume2 },
+  { metric: "99.9%", label: "Uptime", icon: Zap },
+  { metric: "150+", label: "Languages", icon: Globe },
+  { metric: "500K+", label: "Happy Users", icon: Users },
+];
 
 // Company logos for social proof
 const trustedCompanies = [
-  'Microsoft', 'Google', 'Amazon', 'Meta', 'Apple', 'Netflix', 'Spotify', 'Adobe'
-]
+  "Microsoft",
+  "Google",
+  "Amazon",
+  "Meta",
+  "Apple",
+  "Netflix",
+  "Spotify",
+  "Adobe",
+];
 
 export default function LandingPage() {
-  const [currentDemoText, setCurrentDemoText] = useState(0)
-  const [selectedVoice, setSelectedVoice] = useState('sarah')
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [audioContext, setAudioContext] = useState<AudioContext | null>(null)
-  const [userHasInteracted, setUserHasInteracted] = useState(false)
-  
-  const heroRef = useRef<HTMLElement>(null)
-  const featuresRef = useRef<HTMLElement>(null)
-  
-  const { scrollYProgress } = useScroll()
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.3], [1, 0])
-  const heroScale = useTransform(scrollYProgress, [0, 0.3], [1, 0.8])
-  
-  const isHeroInView = useInView(heroRef, { once: true })
-  const isFeaturesInView = useInView(featuresRef, { once: true })
+  const [currentDemoText, setCurrentDemoText] = useState(0);
+  const [selectedVoice, setSelectedVoice] = useState("sarah");
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  const [userHasInteracted, setUserHasInteracted] = useState(false);
+
+  const heroRef = useRef<HTMLElement>(null);
+  const featuresRef = useRef<HTMLElement>(null);
+
+  const { scrollYProgress } = useScroll();
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.3], [1, 0]);
+  const heroScale = useTransform(scrollYProgress, [0, 0.3], [1, 0.8]);
+
+  const isHeroInView = useInView(heroRef, { once: true });
+  const isFeaturesInView = useInView(featuresRef, { once: true });
 
   // Rotate demo text every 4 seconds
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentDemoText((prev) => (prev + 1) % demoTexts.length)
-    }, 4000)
-    return () => clearInterval(interval)
-  }, [])
+      setCurrentDemoText((prev) => (prev + 1) % demoTexts.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Initialize audio context on first user interaction
   const initializeAudio = async () => {
     if (!audioContext && !userHasInteracted) {
       try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
-        setAudioContext(ctx)
-        setUserHasInteracted(true)
+        const ctx = new (window.AudioContext ||
+          (window as any).webkitAudioContext)();
+        setAudioContext(ctx);
+        setUserHasInteracted(true);
       } catch (error) {
-        console.log('Audio not supported')
+        console.log("Audio not supported");
       }
     }
-  }
+  };
 
   // Handle voice playback (mock for now - would integrate with actual TTS)
   const handlePlayVoice = async () => {
-    await initializeAudio()
-    setIsPlaying(!isPlaying)
-    
+    await initializeAudio();
+    setIsPlaying(!isPlaying);
+
     // Mock audio playback - in real implementation, this would call TTS API
     if (!isPlaying) {
-      setTimeout(() => setIsPlaying(false), 3000)
+      setTimeout(() => setIsPlaying(false), 3000);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black text-white overflow-hidden">
-      
       {/* Hero Section */}
-      <motion.section 
+      <motion.section
         ref={heroRef}
         className="relative min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8"
         style={{ opacity: heroOpacity, scale: heroScale }}
@@ -121,19 +148,18 @@ export default function LandingPage() {
           <div className="absolute bottom-20 right-20 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-float"></div>
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-radial from-green-500/5 to-transparent rounded-full"></div>
         </div>
-        
-        <div className="relative z-10 max-w-7xl mx-auto">
+
+        <div className="relative z-10 max-w-[100rem] mx-auto">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
-            
             {/* Left Side - Content */}
-            <motion.div 
+            <motion.div
               className="text-center lg:text-left space-y-8"
               initial={{ opacity: 0, x: -50 }}
               animate={isHeroInView ? { opacity: 1, x: 0 } : {}}
               transition={{ duration: 0.8, delay: 0.2 }}
             >
               {/* Badge */}
-              <motion.div 
+              <motion.div
                 className="inline-flex items-center space-x-2 glass px-6 py-3 rounded-full border border-green-500/30"
                 initial={{ opacity: 0, y: 20 }}
                 animate={isHeroInView ? { opacity: 1, y: 0 } : {}}
@@ -148,31 +174,34 @@ export default function LandingPage() {
 
               {/* Main Headline */}
               <div className="space-y-4">
-                <motion.h1 
+                <motion.h1
                   className="text-5xl md:text-6xl lg:text-7xl font-bold leading-tight"
                   initial={{ opacity: 0, y: 30 }}
                   animate={isHeroInView ? { opacity: 1, y: 0 } : {}}
                   transition={{ duration: 0.8, delay: 0.6 }}
                 >
-                  Transform{' '}
-                  <span className="gradient-neon animate-pulse-glow">Voice</span>
+                  Transform{" "}
+                  <span className="gradient-neon animate-pulse-glow">
+                    Voice
+                  </span>
                   <br />
                   with AI Magic
                 </motion.h1>
-                
-                <motion.p 
+
+                <motion.p
                   className="text-xl md:text-2xl text-gray-300 max-w-2xl"
                   initial={{ opacity: 0, y: 20 }}
                   animate={isHeroInView ? { opacity: 1, y: 0 } : {}}
                   transition={{ duration: 0.6, delay: 0.8 }}
                 >
-                  Experience the future of voice technology. Create natural speech, 
-                  clone voices, and transform audio with cutting-edge AI powered by ElevenLabs.
+                  Experience the future of voice technology. Create natural
+                  speech, clone voices, and transform audio with cutting-edge AI
+                  powered by ElevenLabs.
                 </motion.p>
               </div>
 
               {/* CTA Buttons */}
-              <motion.div 
+              <motion.div
                 className="flex flex-col sm:flex-row gap-6"
                 initial={{ opacity: 0, y: 20 }}
                 animate={isHeroInView ? { opacity: 1, y: 0 } : {}}
@@ -185,8 +214,8 @@ export default function LandingPage() {
                     <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
                   </button>
                 </Link>
-                
-                <button 
+
+                <button
                   onClick={handlePlayVoice}
                   className="btn-secondary group"
                 >
@@ -200,7 +229,7 @@ export default function LandingPage() {
               </motion.div>
 
               {/* Trust Indicators */}
-              <motion.div 
+              <motion.div
                 className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-8"
                 initial={{ opacity: 0, y: 20 }}
                 animate={isHeroInView ? { opacity: 1, y: 0 } : {}}
@@ -209,7 +238,9 @@ export default function LandingPage() {
                 {trustIndicators.map((item, index) => (
                   <div key={index} className="text-center">
                     <item.icon className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                    <div className="text-3xl font-bold gradient-text">{item.metric}</div>
+                    <div className="text-3xl font-bold gradient-text">
+                      {item.metric}
+                    </div>
                     <div className="text-sm text-gray-400">{item.label}</div>
                   </div>
                 ))}
@@ -217,7 +248,7 @@ export default function LandingPage() {
             </motion.div>
 
             {/* Right Side - Interactive Demo */}
-            <motion.div 
+            <motion.div
               className="relative"
               initial={{ opacity: 0, x: 50 }}
               animate={isHeroInView ? { opacity: 1, x: 0 } : {}}
@@ -227,7 +258,7 @@ export default function LandingPage() {
               <div className="glass-strong rounded-3xl p-8 relative overflow-hidden">
                 {/* Background Pattern */}
                 <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-blue-500/5 rounded-3xl"></div>
-                
+
                 <div className="relative space-y-6">
                   {/* Demo Header */}
                   <div className="flex items-center justify-between">
@@ -273,9 +304,11 @@ export default function LandingPage() {
                       {Array.from({ length: 20 }).map((_, i) => (
                         <div
                           key={i}
-                          className={`audio-bar ${isPlaying ? 'active' : ''}`}
+                          className={`audio-bar ${isPlaying ? "active" : ""}`}
                           style={{
-                            height: isPlaying ? `${Math.random() * 40 + 10}px` : '8px',
+                            height: isPlaying
+                              ? `${Math.random() * 40 + 10}px`
+                              : "8px",
                             animationDelay: `${i * 0.1}s`,
                           }}
                         />
@@ -291,13 +324,19 @@ export default function LandingPage() {
                         onClick={() => setSelectedVoice(voice.id)}
                         className={`p-4 rounded-xl text-left transition-all ${
                           selectedVoice === voice.id
-                            ? 'bg-green-500/20 border-2 border-green-500'
-                            : 'glass border border-gray-600 hover:border-green-500/50'
+                            ? "bg-green-500/20 border-2 border-green-500"
+                            : "glass border border-gray-600 hover:border-green-500/50"
                         }`}
                       >
-                        <div className="font-medium text-white">{voice.name}</div>
-                        <div className="text-sm text-gray-400">{voice.description}</div>
-                        <div className="text-xs text-green-400">{voice.accent}</div>
+                        <div className="font-medium text-white">
+                          {voice.name}
+                        </div>
+                        <div className="text-sm text-gray-400">
+                          {voice.description}
+                        </div>
+                        <div className="text-xs text-green-400">
+                          {voice.accent}
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -305,10 +344,14 @@ export default function LandingPage() {
               </div>
 
               {/* Floating Feature Cards */}
-              <motion.div 
+              <motion.div
                 className="absolute -top-6 -right-6 glass rounded-2xl p-4 border border-green-500/30"
                 animate={{ y: [0, -10, 0] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                transition={{
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
               >
                 <div className="flex items-center gap-3">
                   {/* <Lightning className="w-8 h-8 text-yellow-400" /> */}
@@ -319,10 +362,15 @@ export default function LandingPage() {
                 </div>
               </motion.div>
 
-              <motion.div 
+              <motion.div
                 className="absolute -bottom-6 -left-6 glass rounded-2xl p-4 border border-blue-500/30"
                 animate={{ y: [0, 10, 0] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: 1,
+                }}
               >
                 <div className="flex items-center gap-3">
                   <Brain className="w-8 h-8 text-blue-400" />
@@ -339,18 +387,20 @@ export default function LandingPage() {
 
       {/* Social Proof Section */}
       <section className="py-16 border-t border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div 
+        <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div
             className="text-center mb-12"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
             viewport={{ once: true }}
           >
-            <p className="text-gray-400 text-lg">Trusted by industry leaders worldwide</p>
+            <p className="text-gray-400 text-lg">
+              Trusted by industry leaders worldwide
+            </p>
           </motion.div>
-          
-          <motion.div 
+
+          <motion.div
             className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-8 items-center opacity-50"
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 0.5 }}
@@ -374,7 +424,7 @@ export default function LandingPage() {
       </section>
 
       {/* Features Section - Bento Box Layout */}
-      <motion.section 
+      <motion.section
         ref={featuresRef}
         className="py-20 px-4 sm:px-6 lg:px-8"
         initial={{ opacity: 0 }}
@@ -382,8 +432,8 @@ export default function LandingPage() {
         transition={{ duration: 0.8 }}
         viewport={{ once: true }}
       >
-        <div className="max-w-7xl mx-auto">
-          <motion.div 
+        <div className="max-w-[100rem] mx-auto">
+          <motion.div
             className="text-center mb-16"
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -391,19 +441,18 @@ export default function LandingPage() {
             viewport={{ once: true }}
           >
             <h2 className="text-4xl md:text-5xl font-bold mb-6">
-              Three Powerful{' '}
-              <span className="gradient-neon">AI Tools</span>
+              Three Powerful <span className="gradient-neon">AI Tools</span>
             </h2>
             <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-              Everything you need to transform voice and audio content with cutting-edge artificial intelligence
+              Everything you need to transform voice and audio content with
+              cutting-edge artificial intelligence
             </p>
           </motion.div>
 
           {/* Bento Grid */}
           <div className="bento-grid">
-            
             {/* Text to Speech - Large Card */}
-            <motion.div 
+            <motion.div
               className="bento-card lg:col-span-2 lg:row-span-2 relative overflow-hidden group"
               initial={{ opacity: 0, y: 50 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -417,17 +466,18 @@ export default function LandingPage() {
                 </div>
                 <h3 className="text-3xl font-bold mb-4">Text to Speech</h3>
                 <p className="text-gray-400 mb-8 text-lg leading-relaxed">
-                  Convert any written text into natural-sounding speech with our advanced AI voices. 
-                  Perfect for content creation, accessibility, and bringing your words to life.
+                  Convert any written text into natural-sounding speech with our
+                  advanced AI voices. Perfect for content creation,
+                  accessibility, and bringing your words to life.
                 </p>
-                
+
                 {/* Feature highlights */}
                 <div className="space-y-3 mb-8">
                   {[
-                    'Natural human-like voices',
-                    '150+ languages supported',
-                    'Custom voice cloning',
-                    'Real-time generation'
+                    "Natural human-like voices",
+                    "150+ languages supported",
+                    "Custom voice cloning",
+                    "Real-time generation",
                   ].map((feature, index) => (
                     <div key={index} className="flex items-center space-x-3">
                       <CheckCircle className="w-5 h-5 text-green-400" />
@@ -435,7 +485,7 @@ export default function LandingPage() {
                     </div>
                   ))}
                 </div>
-                
+
                 <Link href="/text-to-speech">
                   <button className="btn-primary group">
                     <span>Get Started</span>
@@ -446,7 +496,7 @@ export default function LandingPage() {
             </motion.div>
 
             {/* Speech to Speech */}
-            <motion.div 
+            <motion.div
               className="bento-card relative overflow-hidden group"
               initial={{ opacity: 0, y: 50 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -460,7 +510,8 @@ export default function LandingPage() {
                 </div>
                 <h3 className="text-2xl font-bold mb-3">Speech to Speech</h3>
                 <p className="text-gray-400 mb-6">
-                  Transform existing audio with different voices while preserving emotion and intonation.
+                  Transform existing audio with different voices while
+                  preserving emotion and intonation.
                 </p>
                 <Link href="/speech-to-speech">
                   <button className="btn-secondary text-sm">
@@ -472,7 +523,7 @@ export default function LandingPage() {
             </motion.div>
 
             {/* Speech to Text */}
-            <motion.div 
+            <motion.div
               className="bento-card relative overflow-hidden group"
               initial={{ opacity: 0, y: 50 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -486,7 +537,8 @@ export default function LandingPage() {
                 </div>
                 <h3 className="text-2xl font-bold mb-3">Speech to Text</h3>
                 <p className="text-gray-400 mb-6">
-                  Convert spoken words into accurate written text with advanced speech recognition.
+                  Convert spoken words into accurate written text with advanced
+                  speech recognition.
                 </p>
                 <Link href="/speech-to-text">
                   <button className="btn-secondary text-sm">
@@ -498,7 +550,7 @@ export default function LandingPage() {
             </motion.div>
 
             {/* Performance Stats */}
-            <motion.div 
+            <motion.div
               className="bento-card lg:col-span-2 relative overflow-hidden"
               initial={{ opacity: 0, y: 50 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -518,7 +570,9 @@ export default function LandingPage() {
                 </div>
                 <div>
                   <Award className="w-8 h-8 text-blue-400 mx-auto mb-3" />
-                  <div className="text-3xl font-bold gradient-text">Enterprise</div>
+                  <div className="text-3xl font-bold gradient-text">
+                    Enterprise
+                  </div>
                   <div className="text-gray-400">Grade Security</div>
                 </div>
               </div>
@@ -538,12 +592,12 @@ export default function LandingPage() {
             viewport={{ once: true }}
           >
             <h2 className="text-4xl md:text-5xl font-bold mb-6">
-              Ready to Transform Your{' '}
+              Ready to Transform Your{" "}
               <span className="gradient-neon">Voice?</span>
             </h2>
             <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
-              Join millions of creators, businesses, and developers who trust VoxWave 
-              for their voice AI needs. Start creating today.
+              Join millions of creators, businesses, and developers who trust
+              VoxWave for their voice AI needs. Start creating today.
             </p>
             <div className="flex flex-col sm:flex-row gap-6 justify-center">
               <Link href="/text-to-speech">
@@ -558,5 +612,5 @@ export default function LandingPage() {
         </div>
       </section>
     </div>
-  )
+  );
 }

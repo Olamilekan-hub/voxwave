@@ -314,8 +314,8 @@ class ElevenLabsService {
         return { valid: false, error: 'File too large (max 25MB)' };
       }
 
-      // Check minimum file size (should be at least 1MB for quality)
-      if (fileSizeMB < 1) {
+    //   Check minimum file size (should be at least 1MB for quality)
+      if (fileSizeMB < .5) {
         return { valid: false, error: 'File too small (min 1MB recommended)' };
       }
 

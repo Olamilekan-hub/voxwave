@@ -27,10 +27,11 @@ import { audioUtils } from "@/lib/api";
 // Updated API functions for STT
 const sttApi = {
   async transcribeAudio(formData: FormData) {
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-    
+    const API_BASE_URL =
+      process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
     const response = await fetch(`${API_BASE_URL}/api/stt/transcribe`, {
-      method: 'POST',
+      method: "POST",
       body: formData,
     });
 
@@ -41,23 +42,26 @@ const sttApi = {
       } catch {
         errorData = { message: `HTTP error! status: ${response.status}` };
       }
-      throw new Error(errorData.message || errorData.error || 'Failed to transcribe audio');
+      throw new Error(
+        errorData.message || errorData.error || "Failed to transcribe audio"
+      );
     }
 
     return await response.json();
   },
 
   async getTranscriptionInfo() {
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-    
+    const API_BASE_URL =
+      process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
     const response = await fetch(`${API_BASE_URL}/api/stt/info`);
-    
+
     if (!response.ok) {
-      throw new Error('Failed to get transcription info');
+      throw new Error("Failed to get transcription info");
     }
-    
+
     return await response.json();
-  }
+  },
 };
 
 const SpeechToTextPage = () => {
@@ -82,7 +86,7 @@ const SpeechToTextPage = () => {
   // Audio hooks
   const audio = useAudio(audioUrl);
   const audioRecorder = useAudioRecorder({
-    audioBitsPerSecond: 128000
+    audioBitsPerSecond: 128000,
   });
 
   // Load supported languages and info on mount
@@ -104,12 +108,12 @@ const SpeechToTextPage = () => {
     try {
       setIsLoadingInfo(true);
       const response = await sttApi.getTranscriptionInfo();
-      
+
       if (response.success) {
         setSupportedLanguages(response.data.supportedLanguages);
       }
     } catch (error) {
-      console.error('Error loading transcription info:', error);
+      console.error("Error loading transcription info:", error);
       // Fallback languages
       setSupportedLanguages([
         { code: "en-US", name: "English (US)", flag: "🇺🇸" },
@@ -128,10 +132,10 @@ const SpeechToTextPage = () => {
     if (file) {
       const validation = audioUtils.validateAudioFile(file);
       if (!validation.valid) {
-        setError(validation.error || 'Invalid file');
+        setError(validation.error || "Invalid file");
         return;
       }
-      
+
       setUploadedFile(file);
       audioRecorder.clearRecording(); // Clear recording when uploading
       const url = URL.createObjectURL(file);
@@ -141,26 +145,29 @@ const SpeechToTextPage = () => {
     }
   };
 
-  const handleDrop = useCallback((event: React.DragEvent) => {
-    event.preventDefault();
-    setIsDragging(false);
-    
-    const file = event.dataTransfer.files[0];
-    if (file) {
-      const validation = audioUtils.validateAudioFile(file);
-      if (!validation.valid) {
-        setError(validation.error || 'Invalid file');
-        return;
+  const handleDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+      setIsDragging(false);
+
+      const file = event.dataTransfer.files[0];
+      if (file) {
+        const validation = audioUtils.validateAudioFile(file);
+        if (!validation.valid) {
+          setError(validation.error || "Invalid file");
+          return;
+        }
+
+        setUploadedFile(file);
+        audioRecorder.clearRecording();
+        const url = URL.createObjectURL(file);
+        setAudioUrl(url);
+        clearTranscriptionResults();
+        setError(null);
       }
-      
-      setUploadedFile(file);
-      audioRecorder.clearRecording();
-      const url = URL.createObjectURL(file);
-      setAudioUrl(url);
-      clearTranscriptionResults();
-      setError(null);
-    }
-  }, [audioRecorder]);
+    },
+    [audioRecorder]
+  );
 
   const handleDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -174,7 +181,7 @@ const SpeechToTextPage = () => {
 
   const handleTranscribe = async () => {
     if (!audioUrl) {
-      setError('Please upload an audio file or record your voice');
+      setError("Please upload an audio file or record your voice");
       return;
     }
 
@@ -183,45 +190,52 @@ const SpeechToTextPage = () => {
 
     try {
       const formData = new FormData();
-      
+
       // Add the audio file
       if (uploadedFile) {
-        formData.append('audio', uploadedFile);
+        formData.append("audio", uploadedFile);
       } else if (audioRecorder.audioBlob) {
-        formData.append('audio', audioRecorder.audioBlob, 'recorded-audio.webm');
+        formData.append(
+          "audio",
+          audioRecorder.audioBlob,
+          "recorded-audio.webm"
+        );
       } else {
-        throw new Error('No audio file available');
+        throw new Error("No audio file available");
       }
-      
+
       // Add transcription options
-      formData.append('language', selectedLanguage);
-      formData.append('includeTimestamps', includeTimestamps.toString());
-      formData.append('speakerDiarization', speakerDiarization.toString());
-      formData.append('enhanceAudio', enhanceAudio.toString());
-      
-      console.log('Transcribing audio with options:', {
+      formData.append("language", selectedLanguage);
+      formData.append("includeTimestamps", includeTimestamps.toString());
+      formData.append("speakerDiarization", speakerDiarization.toString());
+      formData.append("enhanceAudio", enhanceAudio.toString());
+
+      console.log("Transcribing audio with options:", {
         language: selectedLanguage,
         includeTimestamps,
         speakerDiarization,
-        enhanceAudio
+        enhanceAudio,
       });
-      
+
       const response = await sttApi.transcribeAudio(formData);
-      
+
       if (response.success) {
         setTranscriptionResult(response.data);
         setTranscription(response.data.transcription);
         setConfidence(response.data.confidence);
         setError(null);
-        
-        console.log('Transcription completed successfully');
+
+        console.log("Transcription completed successfully");
       } else {
-        throw new Error('Transcription failed');
+        throw new Error("Transcription failed");
       }
-      
     } catch (error) {
-      console.error('Error transcribing audio:', error);
-      setError(`Failed to transcribe audio: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error("Error transcribing audio:", error);
+      setError(
+        `Failed to transcribe audio: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     } finally {
       setIsTranscribing(false);
     }
@@ -232,13 +246,13 @@ const SpeechToTextPage = () => {
       await navigator.clipboard.writeText(transcription);
       // Could add a toast notification here
     } catch (error) {
-      console.error('Failed to copy transcription:', error);
+      console.error("Failed to copy transcription:", error);
     }
   };
 
   const downloadTranscription = () => {
     if (!transcription) return;
-    
+
     const blob = new Blob([transcription], { type: "text/plain" });
     audioUtils.downloadBlob(blob, `voxwave-transcription-${Date.now()}.txt`);
   };
@@ -268,7 +282,7 @@ const SpeechToTextPage = () => {
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   if (!mounted) {
@@ -291,7 +305,7 @@ const SpeechToTextPage = () => {
           theme === "dark" ? "border-gray-800" : "border-gray-200"
         }`}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex items-center space-x-4 mb-4">
             <div className="w-12 h-12 bg-gradient-to-r from-green-400 to-green-600 rounded-2xl flex items-center justify-center">
               <FileText className="w-6 h-6 text-black" />
@@ -364,8 +378,8 @@ const SpeechToTextPage = () => {
               }`}
             >
               <div className="text-2xl font-bold text-green-400">
-                {supportedLanguages.find((l) => l.code === selectedLanguage)?.flag ||
-                  "🌐"}
+                {supportedLanguages.find((l) => l.code === selectedLanguage)
+                  ?.flag || "🌐"}
               </div>
               <div
                 className={`text-sm ${
@@ -381,7 +395,7 @@ const SpeechToTextPage = () => {
 
       {/* Error Banner */}
       {(error || audio.error || audioRecorder.error) && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4 flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <AlertCircle className="w-5 h-5 text-red-400" />
@@ -399,7 +413,7 @@ const SpeechToTextPage = () => {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-8">
@@ -421,8 +435,8 @@ const SpeechToTextPage = () => {
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
                     className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
-                      isDragging 
-                        ? 'border-green-500 bg-green-500/10' 
+                      isDragging
+                        ? "border-green-500 bg-green-500/10"
                         : theme === "dark"
                         ? "border-gray-600 hover:border-green-500 bg-gray-800/50"
                         : "border-gray-300 hover:border-green-500 bg-gray-50"
@@ -468,7 +482,11 @@ const SpeechToTextPage = () => {
                     ) : (
                       <>
                         <button
-                          onClick={audioRecorder.isRecording ? audioRecorder.stopRecording : audioRecorder.startRecording}
+                          onClick={
+                            audioRecorder.isRecording
+                              ? audioRecorder.stopRecording
+                              : audioRecorder.startRecording
+                          }
                           disabled={!audioRecorder.isSupported}
                           className={`w-20 h-20 rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                             audioRecorder.isRecording
@@ -482,7 +500,7 @@ const SpeechToTextPage = () => {
                             <Mic className="w-8 h-8 text-black" />
                           )}
                         </button>
-                        
+
                         <p
                           className={`mt-4 ${
                             theme === "dark" ? "text-gray-400" : "text-gray-600"
@@ -491,7 +509,10 @@ const SpeechToTextPage = () => {
                           {audioRecorder.isRecording ? (
                             <span className="flex items-center justify-center space-x-2">
                               <Clock className="w-4 h-4" />
-                              <span>Recording: {formatDuration(audioRecorder.duration)}</span>
+                              <span>
+                                Recording:{" "}
+                                {formatDuration(audioRecorder.duration)}
+                              </span>
                             </span>
                           ) : (
                             "Click to start recording"
@@ -532,7 +553,10 @@ const SpeechToTextPage = () => {
                         >
                           {uploadedFile ? uploadedFile.name : "Recorded Audio"}
                           {audio.duration > 0 && (
-                            <span> • {audioUtils.formatDuration(audio.duration)}</span>
+                            <span>
+                              {" "}
+                              • {audioUtils.formatDuration(audio.duration)}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -548,7 +572,7 @@ const SpeechToTextPage = () => {
                       <Trash2 className="w-5 h-5" />
                     </button>
                   </div>
-                  
+
                   {/* Progress Bar */}
                   {audio.duration > 0 && (
                     <div className="mb-4">
@@ -556,12 +580,22 @@ const SpeechToTextPage = () => {
                         type="range"
                         min="0"
                         max="100"
-                        value={audio.duration > 0 ? (audio.currentTime / audio.duration) * 100 : 0}
-                        onChange={(e) => audio.seek((parseFloat(e.target.value) / 100) * audio.duration)}
+                        value={
+                          audio.duration > 0
+                            ? (audio.currentTime / audio.duration) * 100
+                            : 0
+                        }
+                        onChange={(e) =>
+                          audio.seek(
+                            (parseFloat(e.target.value) / 100) * audio.duration
+                          )
+                        }
                         className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-green-500"
                       />
                       <div className="flex justify-between text-sm text-gray-500 mt-1">
-                        <span>{audioUtils.formatDuration(audio.currentTime)}</span>
+                        <span>
+                          {audioUtils.formatDuration(audio.currentTime)}
+                        </span>
                         <span>{audioUtils.formatDuration(audio.duration)}</span>
                       </div>
                     </div>
@@ -574,11 +608,11 @@ const SpeechToTextPage = () => {
                         <div
                           key={i}
                           className={`w-1 bg-green-400 rounded-full transition-all duration-75 ${
-                            audio.isPlaying ? 'animate-pulse' : ''
+                            audio.isPlaying ? "animate-pulse" : ""
                           }`}
-                          style={{ 
+                          style={{
                             height: `${Math.random() * 50 + 10}px`,
-                            opacity: audio.isPlaying ? 0.8 : 0.4
+                            opacity: audio.isPlaying ? 0.8 : 0.4,
                           }}
                         />
                       ))}
@@ -682,7 +716,10 @@ const SpeechToTextPage = () => {
                           </span>
                           {transcriptionResult.duration && (
                             <span>
-                              Duration: {audioUtils.formatDuration(transcriptionResult.duration)}
+                              Duration:{" "}
+                              {audioUtils.formatDuration(
+                                transcriptionResult.duration
+                              )}
                             </span>
                           )}
                         </div>
@@ -797,9 +834,7 @@ const SpeechToTextPage = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <Volume2 className="w-4 h-4" />
-                    <label className="text-sm font-medium">
-                      Enhance Audio
-                    </label>
+                    <label className="text-sm font-medium">Enhance Audio</label>
                   </div>
                   <button
                     onClick={() => setEnhanceAudio(!enhanceAudio)}
@@ -843,7 +878,8 @@ const SpeechToTextPage = () => {
                 <div className="text-green-400 text-sm">
                   <div>Transcription completed!</div>
                   <div className="text-xs text-green-400/70">
-                    {transcriptionResult.wordCount} words • {Math.round(confidence * 100)}% confidence
+                    {transcriptionResult.wordCount} words •{" "}
+                    {Math.round(confidence * 100)}% confidence
                   </div>
                 </div>
               </div>

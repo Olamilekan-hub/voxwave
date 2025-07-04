@@ -5,7 +5,218 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
 
-// Create a custom voice clone
+// // Create a custom voice clone
+// const createVoice = async (req, res) => {
+//   let uploadedFiles = [];
+  
+//   try {
+//     const { name, description, labels } = req.body;
+//     uploadedFiles = req.files || [];
+    
+//     console.log('🎭 Starting voice creation process...');
+//     console.log('Voice name:', name);
+//     console.log('Files uploaded:', uploadedFiles.length);
+    
+//     // Validation
+//     if (!name || !name.trim()) {
+//       return res.status(400).json({
+//         success: false,
+//         error: 'Missing voice name',
+//         message: 'Please provide a name for the voice'
+//       });
+//     }
+    
+//     if (!uploadedFiles || uploadedFiles.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         error: 'No audio files',
+//         message: 'Please upload at least one audio file'
+//       });
+//     }
+
+//     // Validate each audio file
+//     for (const file of uploadedFiles) {
+//       const validation = await ElevenLabsService.validateAudioForCloning(file.path);
+//       if (!validation.valid) {
+//         cleanupFiles(uploadedFiles);
+//         return res.status(400).json({
+//           success: false,
+//           error: 'Invalid audio file',
+//           message: `${file.originalname}: ${validation.error}`
+//         });
+//       }
+//     }
+
+//     // Check voice quota
+//     const quota = await ElevenLabsService.getVoiceQuota();
+//     if (!quota.can_create_voice) {
+//       cleanupFiles(uploadedFiles);
+//       return res.status(429).json({
+//         success: false,
+//         error: 'Voice quota exceeded',
+//         message: `Voice limit reached (${quota.voices_used}/${quota.voices_limit})`
+//       });
+//     }
+
+//     // Parse labels if provided
+//     let parsedLabels = {};
+//     if (labels) {
+//       try {
+//         parsedLabels = typeof labels === 'string' ? JSON.parse(labels) : labels;
+//       } catch (error) {
+//         console.warn('Invalid labels format, using defaults');
+//       }
+//     }
+
+//     console.log('🔄 Creating voice with ElevenLabs...');
+    
+//     // Create voice using ElevenLabs
+//     const voiceResult = await ElevenLabsService.createVoice(
+//       name.trim(),
+//       description || `Custom voice: ${name}`,
+//       uploadedFiles.map(file => file.path),
+//       parsedLabels
+//     );
+
+//     // Generate internal voice ID
+//     const internalVoiceId = uuidv4();
+
+//     // Store voice in database
+//     const voiceRecord = await query(
+//       `INSERT INTO voices 
+//        (voice_id, elevenlabs_voice_id, name, description, original_file_path, file_size, created_at) 
+//        VALUES ($1, $2, $3, $4, $5, $6, NOW()) 
+//        RETURNING *`,
+//       [
+//         internalVoiceId,
+//         voiceResult.voice_id,
+//         name.trim(),
+//         description || `Custom voice: ${name}`,
+//         uploadedFiles[0].path, // Store first file path as reference
+//         uploadedFiles.reduce((total, file) => total + file.size, 0)
+//       ]
+//     );
+
+//     // Update usage statistics
+//     await updateUsageStats('voices_created', 1);
+//     await updateUsageStats('api_calls_made', 1);
+
+//     // Clean up uploaded files after successful processing
+//     setTimeout(() => {
+//       cleanupFiles(uploadedFiles);
+//     }, 5000); // Delay cleanup to ensure voice creation is complete
+
+//     console.log(`✅ Voice created successfully: ${voiceResult.voice_id}`);
+    
+//     const response = {
+//       success: true,
+//       data: {
+//         voiceId: internalVoiceId,
+//         elevenLabsVoiceId: voiceResult.voice_id,
+//         name: name.trim(),
+//         description: description || `Custom voice: ${name}`,
+//         status: 'created',
+//         createdAt: new Date().toISOString(),
+//         filesProcessed: uploadedFiles.length,
+//         totalSize: uploadedFiles.reduce((total, file) => total + file.size, 0)
+//       },
+//       message: voiceResult.message || 'Voice created successfully'
+//     };
+    
+//     res.json(response);
+    
+//   } catch (error) {
+//     console.error('❌ Error creating voice:', error.message);
+    
+//     // Clean up files in case of error
+//     cleanupFiles(uploadedFiles);
+    
+//     // Handle specific ElevenLabs errors
+//     if (error.message.includes('quota')) {
+//       return res.status(429).json({
+//         success: false,
+//         error: 'Quota exceeded',
+//         message: 'Voice cloning quota exceeded. Please upgrade your plan.'
+//       });
+//     }
+    
+//     if (error.message.includes('duration')) {
+//       return res.status(400).json({
+//         success: false,
+//         error: 'Audio too short',
+//         message: 'Audio files must be at least 10 seconds long for voice cloning.'
+//       });
+//     }
+    
+//     if (error.message.includes('quality')) {
+//       return res.status(400).json({
+//         success: false,
+//         error: 'Poor audio quality',
+//         message: 'Please upload high-quality audio recordings for better voice cloning.'
+//       });
+//     }
+    
+//     res.status(500).json({
+//       success: false,
+//       error: 'Voice creation failed',
+//       message: error.message
+//     });
+//   }
+// };
+
+// // List all available voices (ElevenLabs + custom)
+// const listVoices = async (req, res) => {
+//   try {
+//     console.log('📋 Fetching all available voices...');
+    
+//     // Get ElevenLabs voices
+//     const elevenLabsVoices = await ElevenLabsService.getVoices();
+    
+//     // Get custom voices from database
+//     const customVoicesResult = await query(
+//       `SELECT voice_id, elevenlabs_voice_id, name, description, created_at, file_size 
+//        FROM voices 
+//        ORDER BY created_at DESC`
+//     );
+
+//     const customVoices = customVoicesResult.rows.map(voice => ({
+//       voice_id: voice.voice_id,
+//       elevenlabs_voice_id: voice.elevenlabs_voice_id,
+//       name: voice.name,
+//       description: voice.description,
+//       category: 'custom',
+//       is_custom: true,
+//       created_at: voice.created_at,
+//       file_size: voice.file_size
+//     }));
+    
+//     const response = {
+//       success: true,
+//       data: {
+//         elevenLabsVoices: elevenLabsVoices.voices,
+//         customVoices: customVoices,
+//         total: elevenLabsVoices.voices.length + customVoices.length,
+//         counts: {
+//           elevenlabs: elevenLabsVoices.voices.length,
+//           custom: customVoices.length
+//         }
+//       },
+//       message: 'Voices retrieved successfully'
+//     };
+    
+//     res.json(response);
+    
+//   } catch (error) {
+//     console.error('❌ Error listing voices:', error.message);
+//     res.status(500).json({
+//       success: false,
+//       error: 'Failed to list voices',
+//       message: error.message
+//     });
+//   }
+// };
+
+// Create a custom voice clone - FIXED VERSION
 const createVoice = async (req, res) => {
   let uploadedFiles = [];
   
@@ -16,6 +227,7 @@ const createVoice = async (req, res) => {
     console.log('🎭 Starting voice creation process...');
     console.log('Voice name:', name);
     console.log('Files uploaded:', uploadedFiles.length);
+    console.log('Request files field:', Object.keys(req.files || {}));
     
     // Validation
     if (!name || !name.trim()) {
@@ -34,6 +246,15 @@ const createVoice = async (req, res) => {
       });
     }
 
+    if (uploadedFiles.length > 5) {
+      cleanupFiles(uploadedFiles);
+      return res.status(400).json({
+        success: false,
+        error: 'Too many files',
+        message: 'Maximum 5 voice samples allowed'
+      });
+    }
+
     // Validate each audio file
     for (const file of uploadedFiles) {
       const validation = await ElevenLabsService.validateAudioForCloning(file.path);
@@ -48,14 +269,19 @@ const createVoice = async (req, res) => {
     }
 
     // Check voice quota
-    const quota = await ElevenLabsService.getVoiceQuota();
-    if (!quota.can_create_voice) {
-      cleanupFiles(uploadedFiles);
-      return res.status(429).json({
-        success: false,
-        error: 'Voice quota exceeded',
-        message: `Voice limit reached (${quota.voices_used}/${quota.voices_limit})`
-      });
+    try {
+      const quota = await ElevenLabsService.getVoiceQuota();
+      if (!quota.can_create_voice) {
+        cleanupFiles(uploadedFiles);
+        return res.status(429).json({
+          success: false,
+          error: 'Voice quota exceeded',
+          message: `Voice limit reached (${quota.voices_used}/${quota.voices_limit})`
+        });
+      }
+    } catch (quotaError) {
+      console.warn('Could not check voice quota:', quotaError.message);
+      // Continue without quota check if ElevenLabs API is having issues
     }
 
     // Parse labels if provided
@@ -164,7 +390,7 @@ const createVoice = async (req, res) => {
   }
 };
 
-// List all available voices (ElevenLabs + custom)
+// List all available voices (ElevenLabs + custom) - ENHANCED
 const listVoices = async (req, res) => {
   try {
     console.log('📋 Fetching all available voices...');
@@ -193,11 +419,11 @@ const listVoices = async (req, res) => {
     const response = {
       success: true,
       data: {
-        elevenLabsVoices: elevenLabsVoices.voices,
+        elevenLabsVoices: elevenLabsVoices.voices || [],
         customVoices: customVoices,
-        total: elevenLabsVoices.voices.length + customVoices.length,
+        total: (elevenLabsVoices.voices?.length || 0) + customVoices.length,
         counts: {
-          elevenlabs: elevenLabsVoices.voices.length,
+          elevenlabs: elevenLabsVoices.voices?.length || 0,
           custom: customVoices.length
         }
       },
@@ -215,6 +441,7 @@ const listVoices = async (req, res) => {
     });
   }
 };
+
 
 // Get voice details
 const getVoice = async (req, res) => {
