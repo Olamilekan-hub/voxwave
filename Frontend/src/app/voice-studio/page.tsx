@@ -1,4 +1,4 @@
-import VoiceStudioPage from "./VoiceStudioPage ";
+import VoiceStudioPage from "./VoiceStudioPage";
 
 export default function Page() {
   return <VoiceStudioPage />;

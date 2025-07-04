@@ -157,8 +157,6 @@ const VoiceStudioPage = () => {
     gender: "male",
     loudness: "normal",
     tempo: "normal",
-    texture: "smooth",
-    stability: "stable",
   });
 
   // UI states
@@ -863,6 +861,7 @@ const VoiceStudioPage = () => {
                             <option value="british">British</option>
                             <option value="australian">Australian</option>
                             <option value="irish">Irish</option>
+                            <option value="canadian">Canadian</option>
                           </>
                         )}
                         {key === "age" && (
@@ -879,10 +878,7 @@ const VoiceStudioPage = () => {
                             <option value="neutral">Neutral</option>
                           </>
                         )}
-                        {(key === "loudness" ||
-                          key === "tempo" ||
-                          key === "texture" ||
-                          key === "stability") && (
+                        {(key === "loudness" || key === "tempo") && (
                           <>
                             <option value="low">Low</option>
                             <option value="normal">Normal</option>

@@ -209,7 +209,7 @@ const VoxWave = () => {
 
             <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
               Create stunning AI voices, clone any voice, and transform speech
-              with our cutting-edge platform powered by ElevenLabs.
+              with our cutting-edge platform powered by VoxWave.
             </p>
 
             {/* CTA Buttons */}
@@ -515,7 +515,7 @@ const VoxWave = () => {
             </span>
           </div>
           <p className="text-gray-500">
-            © 2025 VoxWave. All rights reserved. Powered by ElevenLabs.
+            © 2025 VoxWave. All rights reserved. Powered by VoxWave.
           </p>
         </div>
       </footer>

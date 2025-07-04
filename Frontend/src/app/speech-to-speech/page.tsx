@@ -309,7 +309,7 @@ const SpeechToSpeechPage = () => {
       const customVoice = customVoices.find((v) => v.id === selectedVoice);
 
       if (customVoice) {
-        // For now, we'll use a default voice since ElevenLabs voice cloning requires API setup
+        // For now, we'll use a default voice since VoxWave voice cloning requires API setup
         // In a full implementation, you'd first create the voice clone, then use its ID
         voiceIdToUse =
           voices.length > 0 ? voices[0].voice_id : "21m00Tcm4TlvDq8ikWAM";
@@ -1056,7 +1056,7 @@ const SpeechToSpeechPage = () => {
                                   : "bg-green-500/20 text-green-400"
                               }`}
                             >
-                              {voice.is_custom ? "Custom" : "ElevenLabs"}
+                              {voice.is_custom ? "Custom" : "VoxWave"}
                             </span>
                             {voice.is_custom && (
                               <button

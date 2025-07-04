@@ -196,7 +196,7 @@ export default function LandingPage() {
                 >
                   Experience the future of voice technology. Create natural
                   speech, clone voices, and transform audio with cutting-edge AI
-                  powered by ElevenLabs.
+                  powered by VoxWave.
                 </motion.p>
               </div>
 

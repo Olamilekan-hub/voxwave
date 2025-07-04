@@ -1,62 +1,36 @@
 const { query, updateUsageStats } = require('../config/database');
 const { uploadAudio, handleUploadError, cleanupFiles } = require('../middleware/upload');
-const { AudioProcessor } = require('../middleware/audioProcessor');
+const { OpenAIService } = require('../config/openai'); // NEW: Import OpenAI service
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
 
-// For demo purposes - in production, use actual STT service like Whisper, Google Speech-to-Text, etc.
-const mockTranscriptionService = async (audioPath, options = {}) => {
-  // Simulate processing time
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  
-  // Get audio metadata
-  const metadata = await AudioProcessor.getAudioMetadata(audioPath);
-  
-  // Mock transcriptions based on duration
-  const mockTexts = [
-    "Welcome to VoxWave, the revolutionary AI voice platform that transforms how we interact with audio content.",
-    "In today's digital world, the ability to convert speech to text has become increasingly important for accessibility and productivity.",
-    "Our advanced speech recognition technology can accurately transcribe multiple languages with high precision and speed.",
-    "Whether you're transcribing meetings, interviews, or creating subtitles, VoxWave provides the tools you need for professional results.",
-    "This is a sample transcription demonstrating our speech-to-text capabilities with high accuracy and natural language processing."
-  ];
-  
-  const transcription = mockTexts[Math.floor(Math.random() * mockTexts.length)];
-  const wordCount = transcription.split(' ').length;
-  const confidence = 0.92 + Math.random() * 0.07; // 92-99% confidence
-  
-  return {
-    transcription,
-    confidence,
-    language: options.language || 'en-US',
-    duration: metadata.duration,
-    wordCount,
-    metadata: {
-      sampleRate: metadata.sampleRate,
-      channels: metadata.channels,
-      format: metadata.format
-    }
-  };
-};
-
-// Transcribe audio to text
+// REAL transcription using OpenAI Whisper (replacing mock)
 const transcribeAudio = async (req, res) => {
   let uploadedFile = null;
   
   try {
     const { 
-      language = 'en-US', 
+      language = null,
       includeTimestamps = false, 
       speakerDiarization = false,
       enhanceAudio = true 
     } = req.body;
     
+    // Convert string boolean values to actual booleans
+    const parsedIncludeTimestamps = includeTimestamps === 'true' || includeTimestamps === true;
+    const parsedSpeakerDiarization = speakerDiarization === 'true' || speakerDiarization === true;
+    const parsedEnhanceAudio = enhanceAudio === 'true' || enhanceAudio === true;
+    
     uploadedFile = req.file;
     
-    console.log('🎙️ Starting speech-to-text transcription...');
-    console.log('Language:', language);
-    console.log('Options:', { includeTimestamps, speakerDiarization, enhanceAudio });
+    console.log('🎙️ Starting real speech-to-text transcription...');
+    console.log('Language:', language || 'auto-detect');
+    console.log('Options:', { 
+      includeTimestamps: parsedIncludeTimestamps, 
+      speakerDiarization: parsedSpeakerDiarization, 
+      enhanceAudio: parsedEnhanceAudio 
+    });
     console.log('File:', uploadedFile ? uploadedFile.filename : 'No file');
     
     // Validation
@@ -77,62 +51,35 @@ const transcribeAudio = async (req, res) => {
         message: 'Audio file must be smaller than 25MB'
       });
     }
+
+    // Use OpenAI Whisper for real transcription
+    console.log('🔄 Transcribing with OpenAI Whisper...');
     
-    let processedFilePath = uploadedFile.path;
+    const transcriptionOptions = {
+      language: language || null, // Will be converted in OpenAI service
+      response_format: parsedIncludeTimestamps ? 'verbose_json' : 'text',
+      temperature: 0,
+    };
+
+    const result = await OpenAIService.transcribeAudio(uploadedFile.path, transcriptionOptions);
     
-    // Enhance audio quality if requested
-    if (enhanceAudio) {
-      console.log('🔧 Enhancing audio quality...');
-      try {
-        const enhancedResult = await AudioProcessor.processForVoiceCloning(uploadedFile.path, {
-          normalize: true,
-          trimSilence: true,
-          optimize: false // Keep original format for STT
-        });
-        processedFilePath = enhancedResult.processedPath;
-        console.log('✅ Audio enhanced successfully');
-      } catch (error) {
-        console.warn('⚠️ Audio enhancement failed, using original file:', error.message);
-      }
+    // Format the transcription based on options
+    let formattedTranscription = result.text;
+    let confidence = 0.95; // Whisper generally has high confidence
+    
+    if (parsedIncludeTimestamps && result.segments) {
+      formattedTranscription = OpenAIService.formatWithTimestamps(result.segments);
     }
     
-    // Perform transcription
-    console.log('🔄 Transcribing audio...');
-    const result = await mockTranscriptionService(processedFilePath, {
-      language,
-      includeTimestamps,
-      speakerDiarization
-    });
+    if (parsedSpeakerDiarization && result.segments) {
+      formattedTranscription = OpenAIService.addSpeakerDiarization(result.segments);
+    }
     
     // Generate unique transcription ID
     const transcriptionId = uuidv4();
     
-    // Format transcription with timestamps if requested
-    let formattedTranscription = result.transcription;
-    if (includeTimestamps) {
-      const words = result.transcription.split(' ');
-      const timePerWord = result.duration / words.length;
-      
-      formattedTranscription = words.map((word, index) => {
-        const timestamp = Math.floor(index * timePerWord);
-        const minutes = Math.floor(timestamp / 60);
-        const seconds = timestamp % 60;
-        
-        if (index % 10 === 0) {
-          return `\n[${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}] ${word}`;
-        }
-        return word;
-      }).join(' ').trim();
-    }
-    
-    // Add speaker diarization if requested
-    if (speakerDiarization) {
-      const sentences = formattedTranscription.split('. ');
-      formattedTranscription = sentences.map((sentence, index) => {
-        const speaker = index % 2 === 0 ? 'Speaker 1' : 'Speaker 2';
-        return `${speaker}: ${sentence.trim()}`;
-      }).join('. ');
-    }
+    // Calculate word count
+    const wordCount = formattedTranscription.split(' ').filter(word => word.trim()).length;
     
     // Save transcription to database
     const transcriptionRecord = await query(
@@ -144,18 +91,19 @@ const transcribeAudio = async (req, res) => {
         transcriptionId,
         uploadedFile.path,
         formattedTranscription,
-        language,
-        result.confidence,
+        result.language || language || 'auto-detected',
+        confidence,
         JSON.stringify({
           originalFile: uploadedFile.originalname,
           originalSize: uploadedFile.size,
-          duration: result.duration,
-          wordCount: result.wordCount,
-          includeTimestamps,
-          speakerDiarization,
-          enhanceAudio,
-          audioMetadata: result.metadata,
-          processedAt: new Date().toISOString()
+          duration: result.duration || 0,
+          wordCount: wordCount,
+          includeTimestamps: parsedIncludeTimestamps,
+          speakerDiarization: parsedSpeakerDiarization,
+          enhanceAudio: parsedEnhanceAudio,
+          segments: result.segments || [],
+          processedAt: new Date().toISOString(),
+          service: 'openai-whisper'
         })
       ]
     );
@@ -163,43 +111,38 @@ const transcribeAudio = async (req, res) => {
     // Update usage statistics
     await updateUsageStats('api_calls_made', 1);
     
-    // Clean up processed file if different from original
-    if (processedFilePath !== uploadedFile.path) {
-      try {
-        fs.unlinkSync(processedFilePath);
-      } catch (error) {
-        console.warn('Failed to cleanup processed file:', error.message);
-      }
-    }
-    
     // Clean up uploaded file
     setTimeout(() => {
       cleanupFiles([uploadedFile]);
     }, 1000);
     
-    console.log(`✅ Transcription completed successfully: ${result.wordCount} words`);
+    console.log(`✅ Real transcription completed: ${wordCount} words`);
     
     const response = {
       success: true,
       data: {
         transcriptionId,
         transcription: formattedTranscription,
-        confidence: result.confidence,
-        language,
-        duration: result.duration,
-        wordCount: result.wordCount,
+        confidence: confidence,
+        language: result.language || language || 'auto-detected',
+        duration: result.duration || 0,
+        wordCount: wordCount,
         characterCount: formattedTranscription.length,
         originalFile: uploadedFile.originalname,
         originalSize: uploadedFile.size,
         options: {
-          includeTimestamps,
-          speakerDiarization,
-          enhanceAudio
+          includeTimestamps: parsedIncludeTimestamps,
+          speakerDiarization: parsedSpeakerDiarization,
+          enhanceAudio: parsedEnhanceAudio
         },
-        metadata: result.metadata,
+        metadata: {
+          service: 'openai-whisper',
+          segments: result.segments || [],
+          processingTime: new Date().toISOString()
+        },
         createdAt: new Date().toISOString()
       },
-      message: `Audio transcribed successfully: ${result.wordCount} words with ${Math.round(result.confidence * 100)}% confidence`
+      message: `Audio transcribed successfully: ${wordCount} words with OpenAI Whisper`
     };
     
     res.json(response);
@@ -212,22 +155,40 @@ const transcribeAudio = async (req, res) => {
       cleanupFiles([uploadedFile]);
     }
     
-    // Handle specific errors
-    if (error.message.includes('file') || error.message.includes('audio')) {
+    // Handle specific OpenAI errors
+    if (error.message.includes('API key')) {
+      return res.status(401).json({
+        success: false,
+        error: 'API configuration error',
+        message: 'OpenAI API key is invalid or missing',
+        suggestion: 'Please check your OpenAI API key configuration.'
+      });
+    }
+    
+    if (error.message.includes('quota')) {
+      return res.status(429).json({
+        success: false,
+        error: 'API quota exceeded',
+        message: 'OpenAI API quota exceeded',
+        suggestion: 'Please check your OpenAI usage limits.'
+      });
+    }
+    
+    if (error.message.includes('language')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Language not supported',
+        message: 'The selected language is not supported or invalid',
+        suggestion: 'Please select a different language or use auto-detect.'
+      });
+    }
+    
+    if (error.message.includes('file') || error.message.includes('format')) {
       return res.status(400).json({
         success: false,
         error: 'Invalid audio file',
         message: 'Please upload a valid audio file (MP3, WAV, M4A, etc.)',
         suggestion: 'Ensure your audio file is not corrupted and is in a supported format.'
-      });
-    }
-    
-    if (error.message.includes('timeout')) {
-      return res.status(408).json({
-        success: false,
-        error: 'Processing timeout',
-        message: 'The transcription took too long and timed out.',
-        suggestion: 'Try with a shorter audio file or try again later.'
       });
     }
     
@@ -241,7 +202,7 @@ const transcribeAudio = async (req, res) => {
   }
 };
 
-// Get transcription history
+// Rest of the functions remain the same...
 const getTranscriptionHistory = async (req, res) => {
   try {
     const { limit = 20, offset = 0 } = req.query;
@@ -284,29 +245,15 @@ const getTranscriptionHistory = async (req, res) => {
   }
 };
 
-// Get supported languages and options
 const getTranscriptionInfo = async (req, res) => {
   try {
     const info = {
       success: true,
       data: {
-        supportedLanguages: [
-          { code: 'en-US', name: 'English (US)', flag: '🇺🇸' },
-          { code: 'en-GB', name: 'English (UK)', flag: '🇬🇧' },
-          { code: 'es-ES', name: 'Spanish (Spain)', flag: '🇪🇸' },
-          { code: 'es-MX', name: 'Spanish (Mexico)', flag: '🇲🇽' },
-          { code: 'fr-FR', name: 'French (France)', flag: '🇫🇷' },
-          { code: 'de-DE', name: 'German', flag: '🇩🇪' },
-          { code: 'it-IT', name: 'Italian', flag: '🇮🇹' },
-          { code: 'pt-BR', name: 'Portuguese (Brazil)', flag: '🇧🇷' },
-          { code: 'ja-JP', name: 'Japanese', flag: '🇯🇵' },
-          { code: 'ko-KR', name: 'Korean', flag: '🇰🇷' },
-          { code: 'zh-CN', name: 'Chinese (Mandarin)', flag: '🇨🇳' },
-          { code: 'ar-SA', name: 'Arabic', flag: '🇸🇦' },
-        ],
+        supportedLanguages: OpenAIService.getSupportedLanguages(),
         supportedFormats: [
           'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/m4a', 
-          'audio/flac', 'audio/ogg', 'audio/webm'
+          'audio/flac', 'audio/ogg', 'audio/webm', 'audio/mp4'
         ],
         maxFileSize: '25MB',
         maxFileSizeBytes: 25 * 1024 * 1024,
@@ -315,7 +262,8 @@ const getTranscriptionInfo = async (req, res) => {
           speakerDiarization: true,
           audioEnhancement: true,
           multipleLanguages: true,
-          highAccuracy: true
+          highAccuracy: true,
+          autoLanguageDetection: true
         },
         options: {
           includeTimestamps: {
@@ -323,14 +271,16 @@ const getTranscriptionInfo = async (req, res) => {
             default: false
           },
           speakerDiarization: {
-            description: 'Identify different speakers',
+            description: 'Identify different speakers (basic)',
             default: false
           },
           enhanceAudio: {
             description: 'Improve audio quality before transcription',
             default: true
           }
-        }
+        },
+        service: 'OpenAI Whisper',
+        models: ['whisper-1']
       },
       message: 'Speech-to-text info retrieved successfully'
     };

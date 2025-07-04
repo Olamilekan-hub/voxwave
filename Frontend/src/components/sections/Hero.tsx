@@ -64,7 +64,7 @@ const Hero: React.FC = () => {
 
               <p className="text-lg sm:text-xl lg:text-2xl text-gray-300 leading-relaxed max-w-2xl mx-auto lg:mx-0">
                 Create stunning AI voices, clone any voice, and transform speech
-                with our cutting-edge platform powered by ElevenLabs.
+                with our cutting-edge platform powered by VoxWave.
               </p>
             </motion.div>
 

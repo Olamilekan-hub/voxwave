@@ -13,6 +13,7 @@ const sttRoutes = require("./routes/stt");
 // Import database
 const { testConnection, initializeDatabase } = require("./config/database");
 const { ElevenLabsService } = require("./config/elevenlabs");
+const { OpenAIService } = require('./config/openai');
 const { getUploadPath } = require("./middleware/upload");
 
 const app = express();
@@ -229,7 +230,7 @@ app.use((error, req, res, next) => {
 // Initialize services
 const initializeServices = async () => {
   try {
-    console.log("🚀 Initializing VoxWave services...");
+    console.log('🚀 Initializing VoxWave services...');
 
     // Test database connection
     await testConnection();
@@ -240,12 +241,18 @@ const initializeServices = async () => {
     // Test ElevenLabs connection
     const elevenLabsStatus = await ElevenLabsService.testConnection();
     if (!elevenLabsStatus) {
-      console.warn("⚠️ ElevenLabs API connection failed. Check your API key.");
+      console.warn('⚠️ ElevenLabs API connection failed. Check your API key.');
     }
 
-    console.log("✅ All services initialized successfully");
+    // Test OpenAI connection (NEW)
+    const openAIStatus = await OpenAIService.testConnection();
+    if (!openAIStatus) {
+      console.warn('⚠️ OpenAI API connection failed. Check your API key.');
+    }
+
+    console.log('✅ All services initialized successfully');
   } catch (error) {
-    console.error("❌ Service initialization failed:", error.message);
+    console.error('❌ Service initialization failed:', error.message);
     throw error;
   }
 };

@@ -240,7 +240,7 @@ const Footer = () => {
               theme === "dark" ? "text-gray-400" : "text-gray-600"
             }`}
           >
-            <span>Powered by ElevenLabs</span>
+            <span>Powered by VoxWave</span>
             <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
             <span>v2.1.0</span>
           </div>

@@ -72,7 +72,7 @@ const TextToSpeechPage = () => {
       const response: VoicesResponse = await ttsApi.getVoices();
 
       if (response.success) {
-        // Combine ElevenLabs voices and custom voices
+        // Combine VoxWave voices and custom voices
         const allVoices = [
           ...response.data.elevenLabsVoices,
           ...response.data.customVoices,
@@ -575,7 +575,7 @@ const TextToSpeechPage = () => {
                           </div>
                         </div>
                         <span className="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-400">
-                          ElevenLabs
+                          VoxWave
                         </span>
                       </div>
                     </button>
