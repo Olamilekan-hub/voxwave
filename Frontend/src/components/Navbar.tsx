@@ -160,10 +160,10 @@ const Navbar = () => {
                 >
                   <Link
                     href={item.href}
-                    className={`group relative flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 ${
+                    className={`group relative flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 text-black ${
                       isActive(item.href)
                         ? "bg-green-500/20 text-green-400"
-                        : "text-gray-300 hover:text-white hover:bg-white/5"
+                        : "text-gray-400 hover:text-white hover:bg-white/5"
                     }`}
                   >
                     <Icon
