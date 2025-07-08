@@ -313,7 +313,110 @@ export const audioUtils = {
   }
 };
 
-// Types for TypeScript - UPDATED
+
+export const demoApi = {
+  // Get all pre-generated demo audio
+  async getDemoAudio(): Promise<DemoAudioResponse> {
+    return apiCall('/api/demo/audio');
+  },
+
+  // Get specific demo audio by ID
+  async getDemoAudioById(demoId: string): Promise<SingleDemoAudioResponse> {
+    return apiCall(`/api/demo/audio/${demoId}`);
+  },
+
+  // Generate all demo audio (admin function)
+  async generateDemoAudio(): Promise<DemoGenerationResponse> {
+    return apiCall('/api/demo/generate', {
+      method: 'POST',
+    });
+  },
+
+  // Validate demo audio files
+  async validateDemoAudio(): Promise<DemoValidationResponse> {
+    return apiCall('/api/demo/validate');
+  },
+
+  // Get demo texts
+  async getDemoTexts(): Promise<DemoTextsResponse> {
+    return apiCall('/api/demo/texts');
+  },
+
+  // Regenerate specific demo audio
+  async regenerateDemoAudio(demoId: string): Promise<SingleDemoAudioResponse> {
+    return apiCall(`/api/demo/regenerate/${demoId}`, {
+      method: 'POST',
+    });
+  },
+};
+
+// Add these new TypeScript interfaces at the end of the file
+
+export interface DemoAudio {
+  id: number;
+  demo_id: string;
+  text: string;
+  voice_id: string;
+  voice_name: string;
+  file_path: string;
+  file_url: string;
+  file_size: number;
+  duration: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DemoAudioResponse {
+  success: boolean;
+  data: {
+    demos: DemoAudio[];
+    total: number;
+    voice_used: string;
+  };
+  message: string;
+}
+
+export interface SingleDemoAudioResponse {
+  success: boolean;
+  data: DemoAudio;
+  message: string;
+}
+
+export interface DemoGenerationResponse {
+  success: boolean;
+  data: {
+    generated: DemoAudio[];
+    total: number;
+    voice_used: string;
+  };
+  message: string;
+}
+
+export interface DemoValidationResponse {
+  success: boolean;
+  data: {
+    total: number;
+    valid: number;
+    missing: number;
+    audios: DemoAudio[];
+  };
+  message: string;
+}
+
+export interface DemoTextsResponse {
+  success: boolean;
+  data: {
+    texts: Array<{
+      demo_id: string;
+      text: string;
+    }>;
+    total: number;
+  };
+  message: string;
+}
+
+
+
 export interface Voice {
   voice_id: string;
   name: string;

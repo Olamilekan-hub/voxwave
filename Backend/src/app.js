@@ -10,6 +10,9 @@ const ttsRoutes = require("./routes/tts");
 const voiceRoutes = require("./routes/voice");
 const sttRoutes = require("./routes/stt");
 
+const { DemoAudioService } = require('./services/demoAudioService');
+
+
 // Import database
 const { testConnection, initializeDatabase } = require("./config/database");
 const { ElevenLabsService } = require("./config/elevenlabs");
@@ -186,6 +189,9 @@ app.use("*", (req, res) => {
       "POST /api/voice/convert",
       "GET /api/voice/list",
       "POST /api/stt/transcribe",
+      "GET /api/demo/audio",
+      "POST /api/demo/generate", 
+      "GET /api/demo/validate",
     ],
   });
 });
@@ -248,6 +254,33 @@ const initializeServices = async () => {
     const openAIStatus = await OpenAIService.testConnection();
     if (!openAIStatus) {
       console.warn('⚠️ OpenAI API connection failed. Check your API key.');
+    }
+
+    // Initialize demo audio (NEW)
+    if (elevenLabsStatus) {
+      try {
+        console.log('🎙️ Checking demo audio availability...');
+        const validation = await DemoAudioService.validateDemoAudio();
+        
+        if (validation.valid === 0) {
+          console.log('📢 No demo audio found. Generating with Elon Musk voice...');
+          await DemoAudioService.generateAllDemoAudio();
+          console.log('✅ Demo audio generation completed');
+        } else {
+          console.log(`✅ Found ${validation.valid}/${validation.total} valid demo audio files`);
+          
+          // Regenerate missing files
+          if (validation.missing > 0) {
+            console.log(`🔄 Regenerating ${validation.missing} missing demo audio files...`);
+            await DemoAudioService.generateAllDemoAudio();
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ Demo audio initialization failed:', error.message);
+        console.log('💡 Demo audio can be generated later via /api/demo/generate');
+      }
+    } else {
+      console.warn('⚠️ Skipping demo audio generation - ElevenLabs API not available');
     }
 
     console.log('✅ All services initialized successfully');

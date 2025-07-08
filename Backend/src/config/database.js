@@ -82,7 +82,25 @@ const initializeDatabase = async () => {
       );
     `);
 
+    // Create demo_audio table for pre-generated hero section audio
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS demo_audio (
+        id SERIAL PRIMARY KEY,
+        demo_id VARCHAR(255) UNIQUE NOT NULL,
+        text TEXT NOT NULL,
+        voice_id VARCHAR(255) NOT NULL,
+        voice_name VARCHAR(255) NOT NULL,
+        file_path VARCHAR(500) NOT NULL,
+        file_url VARCHAR(500) NOT NULL,
+        file_size INTEGER,
+        duration DECIMAL(10,2),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     console.log('✅ Database tables initialized successfully');
+    console.log('✅ Demo audio table initialized successfully');
   } catch (error) {
     console.error('❌ Database initialization failed:', error.message);
     throw error;
