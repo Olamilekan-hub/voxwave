@@ -123,7 +123,7 @@ const Navbar = () => {
       animate="visible"
       transition={{ duration: 0.6, ease: "easeOut" }}
     >
-      <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-3 group">

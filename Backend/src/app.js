@@ -9,6 +9,7 @@ require("dotenv").config();
 const ttsRoutes = require("./routes/tts");
 const voiceRoutes = require("./routes/voice");
 const sttRoutes = require("./routes/stt");
+const demoRoutes = require("./routes/demo");
 
 const { DemoAudioService } = require('./services/demoAudioService');
 
@@ -174,6 +175,7 @@ app.get("/api/info", async (req, res) => {
 app.use("/api/tts", ttsRoutes);
 app.use('/api/voice', voiceRoutes);
 app.use('/api/stt', sttRoutes);
+app.use('/api/demo', demoRoutes);
 
 // 404 Handler
 app.use("*", (req, res) => {

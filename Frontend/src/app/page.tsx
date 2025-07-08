@@ -564,7 +564,7 @@ export default function LandingPage() {
                           theme === "dark" ? "text-gray-400" : "text-gray-600"
                         }`}
                       >
-                        AI-Generated using ElevenLabs
+                        Generated using VoxWave
                       </div>
                       {audio.duration > 0 && (
                         <div className="text-xs text-green-400 mt-1">
@@ -640,7 +640,7 @@ export default function LandingPage() {
                         theme === "dark" ? "text-gray-400" : "text-gray-600"
                       }`}
                     >
-                      ElevenLabs
+                      VoxWave
                     </div>
                   </div>
                 </div>
