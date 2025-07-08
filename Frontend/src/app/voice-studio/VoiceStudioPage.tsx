@@ -422,7 +422,7 @@ const VoiceStudioPage = () => {
 
   return (
     <div
-      className={`min-h-screen pt-16 ${
+      className={`min-h-screen pt-16 mt-8 ${
         theme === "dark" ? "bg-black text-white" : "bg-white text-gray-900"
       }`}
     >
@@ -432,7 +432,7 @@ const VoiceStudioPage = () => {
           theme === "dark" ? "border-gray-800" : "border-gray-200"
         }`}
       >
-        <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4">
               <div className="w-12 h-12 bg-gradient-to-r from-green-400 to-green-600 rounded-2xl flex items-center justify-center">
@@ -451,7 +451,7 @@ const VoiceStudioPage = () => {
             </div>
 
             {/* Tab Navigation */}
-            <div
+            {/* <div
               className={`flex rounded-xl p-1 ${
                 theme === "dark" ? "bg-gray-900" : "bg-gray-100"
               }`}
@@ -480,11 +480,11 @@ const VoiceStudioPage = () => {
               >
                 Manage Voices
               </button>
-            </div>
+            </div> */}
           </div>
 
           {/* Quota Info */}
-          {quota && (
+          {/* {quota && (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div
                 className={`p-4 rounded-xl ${
@@ -557,7 +557,7 @@ const VoiceStudioPage = () => {
                 </div>
               </div>
             </div>
-          )}
+          )} */}
         </div>
       </div>
 

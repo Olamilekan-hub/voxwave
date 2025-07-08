@@ -44,11 +44,10 @@ const platformFeatures = [
     id: "text-to-speech",
     title: "Text to Speech",
     icon: FileText,
-    description:
-      "Convert written text into natural-sounding speech with 150+ AI voices",
+    description: "Convert written text into natural-sounding speech with 150+ AI voices",
     features: [
       "150+ Premium Voices",
-      "50+ Languages",
+      "50+ Languages", 
       "SSML Support",
       "Custom Voice Upload",
     ],
@@ -59,8 +58,7 @@ const platformFeatures = [
     id: "speech-to-speech",
     title: "Speech to Speech",
     icon: Waves,
-    description:
-      "Transform existing audio with different voices while preserving emotion",
+    description: "Transform existing audio with different voices while preserving emotion",
     features: [
       "Voice Cloning",
       "Emotion Preservation",
@@ -74,8 +72,7 @@ const platformFeatures = [
     id: "speech-to-text",
     title: "Speech to Text",
     icon: Mic,
-    description:
-      "Convert spoken words into accurate written text with advanced AI",
+    description: "Convert spoken words into accurate written text with advanced AI",
     features: [
       "99% Accuracy",
       "Speaker Detection",
@@ -267,7 +264,7 @@ export default function LandingPage() {
 
   return (
     <div
-      className={`min-h-screen transition-colors duration-300 ${
+      className={`min-h-screen transition-colors duration-300 mt-5 ${
         theme === "dark"
           ? "bg-gradient-to-br from-black via-gray-900 to-black text-white"
           : "bg-gradient-to-br from-white via-gray-50 to-white text-gray-900"
@@ -276,23 +273,23 @@ export default function LandingPage() {
       {/* Hero Section */}
       <motion.section
         ref={heroRef}
-        className="relative min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8"
+        className="relative min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 py-20"
         style={{ opacity: heroOpacity }}
       >
         {/* Background Effects */}
         <div className="absolute inset-0">
           <div
-            className={`absolute top-20 left-20 w-72 h-72 rounded-full blur-3xl animate-pulse-glow ${
+            className={`absolute top-20 left-10 sm:left-20 w-48 h-48 sm:w-72 sm:h-72 rounded-full blur-3xl animate-pulse-glow ${
               theme === "dark" ? "bg-green-500/20" : "bg-green-500/10"
             }`}
           ></div>
           <div
-            className={`absolute bottom-20 right-20 w-96 h-96 rounded-full blur-3xl animate-float ${
+            className={`absolute bottom-20 right-10 sm:right-20 w-64 h-64 sm:w-96 sm:h-96 rounded-full blur-3xl animate-float ${
               theme === "dark" ? "bg-blue-500/10" : "bg-blue-500/5"
             }`}
           ></div>
           <div
-            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full ${
+            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] sm:w-[400px] sm:h-[400px] lg:w-[600px] lg:h-[600px] rounded-full ${
               theme === "dark"
                 ? "bg-gradient-radial from-green-500/5 to-transparent"
                 : "bg-gradient-radial from-green-500/3 to-transparent"
@@ -300,18 +297,18 @@ export default function LandingPage() {
           ></div>
         </div>
 
-        <div className="relative z-10 max-w-[100rem] mx-auto">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
+        <div className="relative z-10 w-full max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center">
             {/* Left Side - Content */}
             <motion.div
-              className="text-center lg:text-left space-y-8"
+              className="text-center lg:text-left space-y-6 lg:space-y-8 order-1 lg:order-1"
               initial={{ opacity: 0, x: -50 }}
               animate={isHeroInView ? { opacity: 1, x: 0 } : {}}
               transition={{ duration: 0.8, delay: 0.2 }}
             >
               {/* Badge */}
               <motion.div
-                className={`inline-flex items-center space-x-2 px-6 py-3 rounded-full border ${
+                className={`inline-flex items-center space-x-2 px-4 sm:px-6 py-2 sm:py-3 rounded-full border text-sm sm:text-base ${
                   theme === "dark"
                     ? "glass border-green-500/30"
                     : "bg-white border-green-500/30 shadow-lg"
@@ -320,17 +317,17 @@ export default function LandingPage() {
                 animate={isHeroInView ? { opacity: 1, y: 0 } : {}}
                 transition={{ duration: 0.6, delay: 0.4 }}
               >
-                <Star className="w-5 h-5 text-yellow-400" />
-                <span className="text-sm font-semibold bg-gradient-to-r from-green-400 to-green-600 bg-clip-text text-transparent">
+                <Star className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400" />
+                <span className="font-semibold bg-gradient-to-r from-green-400 to-green-600 bg-clip-text text-transparent">
                   #1 AI Voice Platform
                 </span>
-                <Sparkles className="w-5 h-5 text-green-400" />
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-green-400" />
               </motion.div>
 
               {/* Main Headline */}
               <div className="space-y-4">
                 <motion.h1
-                  className={`text-5xl md:text-6xl lg:text-7xl font-bold leading-tight ${
+                  className={`text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight ${
                     theme === "dark" ? "text-white" : "text-gray-900"
                   }`}
                   initial={{ opacity: 0, y: 30 }}
@@ -346,7 +343,7 @@ export default function LandingPage() {
                 </motion.h1>
 
                 <motion.p
-                  className={`text-xl md:text-2xl max-w-2xl ${
+                  className={`text-base sm:text-lg md:text-xl lg:text-2xl max-w-2xl mx-auto lg:mx-0 ${
                     theme === "dark" ? "text-gray-300" : "text-gray-600"
                   }`}
                   initial={{ opacity: 0, y: 20 }}
@@ -361,58 +358,67 @@ export default function LandingPage() {
 
               {/* CTA Buttons */}
               <motion.div
-                className="flex flex-col sm:flex-row gap-6"
+                className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center lg:justify-start"
                 initial={{ opacity: 0, y: 20 }}
                 animate={isHeroInView ? { opacity: 1, y: 0 } : {}}
                 transition={{ duration: 0.6, delay: 1 }}
               >
-                <Link href="/text-to-speech">
-                  <button className="btn-primary group">
-                    <Rocket className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+                <Link href="/text-to-speech" className="w-full sm:w-auto">
+                  <button className="btn-primary group w-full sm:w-auto">
+                    <Rocket className="w-5 h-5 sm:w-6 sm:h-6 group-hover:rotate-12 transition-transform" />
                     Start Creating Now
-                    <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+                    <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-x-1 transition-transform" />
                   </button>
                 </Link>
 
                 <button
                   onClick={handlePlayVoice}
                   disabled={isLoadingDemo || !currentAudioUrl}
-                  className={`btn-secondary group ${
+                  className={`btn-secondary group w-full sm:w-auto ${
                     theme === "dark"
                       ? "bg-gray-800/50 border-green-500 text-white hover:bg-green-500 hover:text-black"
                       : "bg-white border-green-500 text-gray-900 hover:bg-green-500 hover:text-white"
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   {isLoadingDemo ? (
-                    <Loader className="w-6 h-6 animate-spin" />
+                    <Loader className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" />
                   ) : audio.isPlaying ? (
-                    <Pause className="w-6 h-6" />
+                    <Pause className="w-5 h-5 sm:w-6 sm:h-6" />
                   ) : (
-                    <Play className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                    <Play className="w-5 h-5 sm:w-6 sm:h-6 group-hover:scale-110 transition-transform" />
                   )}
-                  {isLoadingDemo
-                    ? "Loading..."
-                    : audio.isPlaying
-                    ? "Stop Demo"
-                    : "Hear Elon's Voice"}
+                  <span className="hidden sm:inline">
+                    {isLoadingDemo
+                      ? "Loading..."
+                      : audio.isPlaying
+                      ? "Stop Demo"
+                      : "Hear Elon's Voice"}
+                  </span>
+                  <span className="sm:hidden">
+                    {isLoadingDemo
+                      ? "Loading..."
+                      : audio.isPlaying
+                      ? "Stop"
+                      : "Demo"}
+                  </span>
                 </button>
               </motion.div>
 
               {/* Trust Indicators */}
               <motion.div
-                className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-8"
+                className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6 pt-8"
                 initial={{ opacity: 0, y: 20 }}
                 animate={isHeroInView ? { opacity: 1, y: 0 } : {}}
                 transition={{ duration: 0.6, delay: 1.2 }}
               >
                 {trustIndicators.map((item, index) => (
                   <div key={index} className="text-center">
-                    <item.icon className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                    <div className="text-3xl font-bold gradient-text">
+                    <item.icon className="w-6 h-6 sm:w-8 sm:h-8 text-green-400 mx-auto mb-2" />
+                    <div className="text-2xl sm:text-3xl font-bold gradient-text">
                       {item.metric}
                     </div>
                     <div
-                      className={`text-sm ${
+                      className={`text-xs sm:text-sm ${
                         theme === "dark" ? "text-gray-400" : "text-gray-600"
                       }`}
                     >
@@ -425,14 +431,14 @@ export default function LandingPage() {
 
             {/* Right Side - Interactive Demo */}
             <motion.div
-              className="relative"
+              className="relative order-1 lg:order-2"
               initial={{ opacity: 0, x: 50 }}
               animate={isHeroInView ? { opacity: 1, x: 0 } : {}}
               transition={{ duration: 0.8, delay: 0.4 }}
             >
               {/* Main Demo Container */}
               <div
-                className={`rounded-3xl p-8 relative overflow-hidden ${
+                className={`rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 relative overflow-hidden ${
                   theme === "dark"
                     ? "glass-strong"
                     : "bg-white border-2 border-gray-200 shadow-2xl"
@@ -440,28 +446,28 @@ export default function LandingPage() {
               >
                 {/* Background Pattern */}
                 <div
-                  className={`absolute inset-0 rounded-3xl ${
+                  className={`absolute inset-0 rounded-2xl sm:rounded-3xl ${
                     theme === "dark"
                       ? "bg-gradient-to-br from-green-500/10 to-blue-500/5"
                       : "bg-gradient-to-br from-green-500/5 to-blue-500/3"
                   }`}
                 ></div>
 
-                <div className="relative space-y-6">
+                <div className="relative space-y-4 sm:space-y-6">
                   {/* Demo Header */}
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex items-center justify-between flex-wrap gap-4">
+                    <div className="flex-1 min-w-0">
                       <h3
-                        className={`text-2xl font-bold mb-2 ${
+                        className={`text-lg sm:text-xl lg:text-2xl font-bold mb-1 sm:mb-2 ${
                           theme === "dark" ? "text-white" : "text-gray-900"
                         }`}
                       >
                         Live Voice Synthesis
                       </h3>
                       <p
-                        className={
+                        className={`text-sm sm:text-base ${
                           theme === "dark" ? "text-gray-400" : "text-gray-600"
-                        }
+                        }`}
                       >
                         Experience Elon Musk's AI voice in real-time
                       </p>
@@ -469,27 +475,27 @@ export default function LandingPage() {
                     <motion.button
                       onClick={handlePlayVoice}
                       disabled={isLoadingDemo || !currentAudioUrl}
-                      className="w-16 h-16 bg-gradient-to-r from-green-400 to-green-500 text-black rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-gradient-to-r from-green-400 to-green-500 text-black rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                     >
                       {isLoadingDemo ? (
-                        <Loader className="w-8 h-8 animate-spin" />
+                        <Loader className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 animate-spin" />
                       ) : audio.isLoading ? (
-                        <Loader className="w-8 h-8 animate-spin" />
+                        <Loader className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 animate-spin" />
                       ) : audio.isPlaying ? (
-                        <Pause className="w-8 h-8" />
+                        <Pause className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8" />
                       ) : (
-                        <Play className="w-8 h-8 ml-1" />
+                        <Play className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 ml-0.5 sm:ml-1" />
                       )}
                     </motion.button>
                   </div>
 
                   {/* Error Display */}
                   {(demoError || audio.error) && (
-                    <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4 flex items-center space-x-3">
-                      <AlertCircle className="w-5 h-5 text-red-400" />
-                      <span className="text-red-400 text-sm">
+                    <div className="bg-red-500/10 border border-red-500/50 rounded-lg sm:rounded-xl p-3 sm:p-4 flex items-center space-x-3">
+                      <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-400 flex-shrink-0" />
+                      <span className="text-red-400 text-xs sm:text-sm">
                         {demoError || audio.error}
                       </span>
                     </div>
@@ -497,7 +503,7 @@ export default function LandingPage() {
 
                   {/* Demo Text Display */}
                   <div
-                    className={`rounded-2xl p-6 min-h-[120px] flex items-center ${
+                    className={`rounded-xl sm:rounded-2xl p-4 sm:p-6 min-h-[80px] sm:min-h-[100px] lg:min-h-[120px] flex items-center ${
                       theme === "dark"
                         ? "glass"
                         : "bg-gray-50 border border-gray-200"
@@ -505,7 +511,7 @@ export default function LandingPage() {
                   >
                     <motion.p
                       key={currentDemoIndex}
-                      className={`text-lg font-medium leading-relaxed ${
+                      className={`text-sm sm:text-base lg:text-lg font-medium leading-relaxed ${
                         theme === "dark" ? "text-white" : "text-gray-900"
                       }`}
                       initial={{ opacity: 0, y: 20 }}
@@ -519,14 +525,14 @@ export default function LandingPage() {
 
                   {/* Audio Visualizer */}
                   <div
-                    className={`rounded-2xl p-6 ${
+                    className={`rounded-xl sm:rounded-2xl p-4 sm:p-6 ${
                       theme === "dark"
                         ? "glass"
                         : "bg-gray-50 border border-gray-200"
                     }`}
                   >
                     <div className="audio-visualizer">
-                      {Array.from({ length: 20 }).map((_, i) => (
+                      {Array.from({ length: 15 }).map((_, i) => (
                         <div
                           key={i}
                           className={`audio-bar ${
@@ -534,8 +540,8 @@ export default function LandingPage() {
                           }`}
                           style={{
                             height: audio.isPlaying
-                              ? `${Math.random() * 40 + 10}px`
-                              : "8px",
+                              ? `${Math.random() * 30 + 8}px`
+                              : "6px",
                             animationDelay: `${i * 0.1}s`,
                           }}
                         />
@@ -546,21 +552,21 @@ export default function LandingPage() {
                   {/* Voice Info */}
                   <div className="grid grid-cols-1 gap-3">
                     <div
-                      className={`p-4 rounded-xl text-center ${
+                      className={`p-3 sm:p-4 rounded-lg sm:rounded-xl text-center ${
                         theme === "dark"
                           ? "bg-green-500/10 border border-green-500/30"
                           : "bg-green-50 border border-green-200"
                       }`}
                     >
                       <div
-                        className={`font-medium ${
+                        className={`font-medium text-sm sm:text-base ${
                           theme === "dark" ? "text-white" : "text-gray-900"
                         }`}
                       >
                         🎤 Elon Musk's Voice
                       </div>
                       <div
-                        className={`text-sm ${
+                        className={`text-xs sm:text-sm ${
                           theme === "dark" ? "text-gray-400" : "text-gray-600"
                         }`}
                       >
@@ -576,9 +582,9 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              {/* Floating Feature Cards */}
+              {/* Floating Feature Cards - Hidden on mobile for cleaner look */}
               <motion.div
-                className={`absolute -top-6 -right-6 rounded-2xl p-4 border ${
+                className={`hidden sm:block absolute -top-4 -right-4 lg:-top-6 lg:-right-6 rounded-xl lg:rounded-2xl p-3 lg:p-4 border ${
                   theme === "dark"
                     ? "glass border-green-500/30"
                     : "bg-white border-green-500/30 shadow-lg"
@@ -590,11 +596,11 @@ export default function LandingPage() {
                   ease: "easeInOut",
                 }}
               >
-                <div className="flex items-center gap-3">
-                  <Zap className="w-8 h-8 text-yellow-400" />
+                <div className="flex items-center gap-2 lg:gap-3">
+                  <Zap className="w-6 h-6 lg:w-8 lg:h-8 text-yellow-400" />
                   <div>
                     <div
-                      className={`font-bold ${
+                      className={`font-bold text-sm lg:text-base ${
                         theme === "dark" ? "text-white" : "text-gray-900"
                       }`}
                     >
@@ -612,7 +618,7 @@ export default function LandingPage() {
               </motion.div>
 
               <motion.div
-                className={`absolute -bottom-6 -left-6 rounded-2xl p-4 border ${
+                className={`hidden sm:block absolute -bottom-4 -left-4 lg:-bottom-6 lg:-left-6 rounded-xl lg:rounded-2xl p-3 lg:p-4 border ${
                   theme === "dark"
                     ? "glass border-blue-500/30"
                     : "bg-white border-blue-500/30 shadow-lg"
@@ -625,11 +631,11 @@ export default function LandingPage() {
                   delay: 1,
                 }}
               >
-                <div className="flex items-center gap-3">
-                  <Brain className="w-8 h-8 text-blue-400" />
+                <div className="flex items-center gap-2 lg:gap-3">
+                  <Brain className="w-6 h-6 lg:w-8 lg:h-8 text-blue-400" />
                   <div>
                     <div
-                      className={`font-bold ${
+                      className={`font-bold text-sm lg:text-base ${
                         theme === "dark" ? "text-white" : "text-gray-900"
                       }`}
                     >
@@ -653,7 +659,7 @@ export default function LandingPage() {
       {/* Platform Features Section */}
       <motion.section
         ref={featuresRef}
-        className={`py-20 px-4 sm:px-6 lg:px-8 relative ${
+        className={`section-padding px-4 sm:px-6 lg:px-8 relative ${
           theme === "dark" ? "bg-gray-900/50" : "bg-gray-50/50"
         }`}
         initial={{ opacity: 0 }}
@@ -661,23 +667,23 @@ export default function LandingPage() {
         transition={{ duration: 0.8 }}
         viewport={{ once: true }}
       >
-        <div className="max-w-[100rem] mx-auto">
+        <div className="max-w-7xl mx-auto">
           <motion.div
-            className="text-center mb-16"
+            className="text-center mb-12 lg:mb-16"
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
             viewport={{ once: true }}
           >
             <h2
-              className={`text-4xl md:text-5xl font-bold mb-6 ${
+              className={`text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 lg:mb-6 ${
                 theme === "dark" ? "text-white" : "text-gray-900"
               }`}
             >
               Complete <span className="gradient-neon">AI Voice</span> Platform
             </h2>
             <p
-              className={`text-xl max-w-3xl mx-auto ${
+              className={`text-lg sm:text-xl max-w-3xl mx-auto ${
                 theme === "dark" ? "text-gray-400" : "text-gray-600"
               }`}
             >
@@ -687,13 +693,13 @@ export default function LandingPage() {
           </motion.div>
 
           {/* Feature Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
             {platformFeatures.map((feature, index) => {
               const Icon = feature.icon;
               return (
                 <motion.div
                   key={feature.id}
-                  className={`group relative overflow-hidden rounded-2xl p-8 transition-all duration-300 hover:scale-105 ${
+                  className={`group relative overflow-hidden rounded-xl lg:rounded-2xl p-6 lg:p-8 transition-all duration-300 hover:scale-105 ${
                     theme === "dark"
                       ? "bg-gray-800/50 border border-gray-700 hover:border-green-500/50"
                       : "bg-white border border-gray-200 hover:border-green-500/50 shadow-lg hover:shadow-xl"
@@ -709,13 +715,13 @@ export default function LandingPage() {
 
                   <div className="relative z-10">
                     <div
-                      className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 bg-gradient-to-br ${feature.color}`}
+                      className={`w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 rounded-xl lg:rounded-2xl flex items-center justify-center mb-4 lg:mb-6 bg-gradient-to-br ${feature.color}`}
                     >
-                      <Icon className="w-8 h-8 text-white" />
+                      <Icon className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-white" />
                     </div>
 
                     <h3
-                      className={`text-2xl font-bold mb-4 ${
+                      className={`text-xl lg:text-2xl font-bold mb-3 lg:mb-4 ${
                         theme === "dark" ? "text-white" : "text-gray-900"
                       }`}
                     >
@@ -723,7 +729,7 @@ export default function LandingPage() {
                     </h3>
 
                     <p
-                      className={`mb-6 leading-relaxed ${
+                      className={`mb-4 lg:mb-6 leading-relaxed text-sm sm:text-base ${
                         theme === "dark" ? "text-gray-400" : "text-gray-600"
                       }`}
                     >
@@ -731,12 +737,12 @@ export default function LandingPage() {
                     </p>
 
                     {/* Feature highlights */}
-                    <div className="space-y-2 mb-6">
+                    <div className="space-y-2 mb-4 lg:mb-6">
                       {feature.features.map((featureItem, idx) => (
                         <div key={idx} className="flex items-center space-x-2">
-                          <CheckCircle className="w-4 h-4 text-green-400" />
+                          <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 text-green-400 flex-shrink-0" />
                           <span
-                            className={`text-sm ${
+                            className={`text-xs sm:text-sm ${
                               theme === "dark"
                                 ? "text-gray-300"
                                 : "text-gray-700"
@@ -748,16 +754,16 @@ export default function LandingPage() {
                       ))}
                     </div>
 
-                    <Link href={feature.href}>
+                    <Link href={feature.href} className="block">
                       <button
-                        className={`w-full py-3 rounded-xl font-semibold transition-all group-hover:scale-105 ${
+                        className={`w-full py-3 rounded-lg sm:rounded-xl font-semibold transition-all group-hover:scale-105 text-sm sm:text-base ${
                           theme === "dark"
                             ? "bg-gray-700 hover:bg-green-500/20 text-white border border-gray-600 hover:border-green-500"
                             : "bg-gray-100 hover:bg-green-500/10 text-gray-900 border border-gray-200 hover:border-green-500"
                         }`}
                       >
                         Try {feature.title}
-                        <ArrowRight className="w-4 h-4 inline ml-2 group-hover:translate-x-1 transition-transform" />
+                        <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 inline ml-2 group-hover:translate-x-1 transition-transform" />
                       </button>
                     </Link>
                   </div>
@@ -770,7 +776,7 @@ export default function LandingPage() {
 
       {/* CTA Section */}
       <section
-        className={`py-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden ${
+        className={`section-padding px-4 sm:px-6 lg:px-8 relative overflow-hidden ${
           theme === "dark" ? "" : "bg-white"
         }`}
       >
@@ -789,7 +795,7 @@ export default function LandingPage() {
             viewport={{ once: true }}
           >
             <h2
-              className={`text-4xl md:text-5xl font-bold mb-6 ${
+              className={`text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 lg:mb-6 ${
                 theme === "dark" ? "text-white" : "text-gray-900"
               }`}
             >
@@ -797,19 +803,19 @@ export default function LandingPage() {
               <span className="gradient-neon">Voice?</span>
             </h2>
             <p
-              className={`text-xl mb-8 max-w-2xl mx-auto ${
+              className={`text-lg sm:text-xl mb-6 lg:mb-8 max-w-2xl mx-auto ${
                 theme === "dark" ? "text-gray-400" : "text-gray-600"
               }`}
             >
               Join millions of creators, businesses, and developers who trust
               VoxWave for their voice AI needs. Start creating today.
             </p>
-            <div className="flex flex-col sm:flex-row gap-6 justify-center">
-              <Link href="/text-to-speech">
-                <button className="btn-primary group text-lg px-8 py-4">
-                  <Rocket className="w-6 h-6" />
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">
+              <Link href="/text-to-speech" className="w-full sm:w-auto">
+                <button className="btn-primary group text-lg px-6 lg:px-8 py-4 lg:py-5 w-full sm:w-auto">
+                  <Rocket className="w-5 h-5 sm:w-6 sm:h-6" />
                   Start Creating for Free
-                  <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-x-1 transition-transform" />
                 </button>
               </Link>
             </div>

@@ -295,7 +295,7 @@ const SpeechToTextPage = () => {
 
   return (
     <div
-      className={`min-h-screen pt-16 ${
+      className={`min-h-screen pt-16 mt-5 ${
         theme === "dark" ? "bg-black text-white" : "bg-white text-gray-900"
       }`}
     >

@@ -406,7 +406,7 @@ const TextToSpeechPage = () => {
 
   return (
     <div
-      className={`min-h-screen pt-16 transition-colors duration-300 ${
+      className={`min-h-screen pt-16 transition-colors duration-300 mt-5 ${
         theme === "dark" ? "bg-black text-white" : "bg-white text-gray-900"
       }`}
     >
