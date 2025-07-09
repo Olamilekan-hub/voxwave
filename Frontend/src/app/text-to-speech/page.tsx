@@ -120,6 +120,8 @@ const TextToSpeechPage = () => {
     }
   }, [audioRecorder.audioBlob, audioRecorder.audioUrl, customVoiceName]);
 
+  const voicesContainerRef = useRef<HTMLDivElement>(null);
+
   const loadVoices = async () => {
     try {
       setIsLoadingVoices(true);
@@ -128,29 +130,28 @@ const TextToSpeechPage = () => {
       const response: VoicesResponse = await ttsApi.getVoices();
 
       if (response.success) {
-        // Combine VoxWave voices and custom voices
         const allVoices = [
           ...response.data.elevenLabsVoices,
           ...response.data.customVoices,
         ];
         setVoices(allVoices);
 
-        // Set default voice if available
         if (allVoices.length > 0 && !selectedVoice) {
-          setSelectedVoice(allVoices[0].voice_id);
+          // Select the last voice (original order) which will appear first in display
+          setSelectedVoice(allVoices[allVoices.length - 1].voice_id);
         }
       } else {
-        throw new Error("Failed to load voices from server");
+        throw new Error("Failed to load voices");
       }
     } catch (error) {
       console.error("Error loading voices:", error);
       setError(
-        error instanceof Error 
-          ? `Unable to load voices: ${error.message}. Please check your internet connection and try again.`
-          : "Unable to load voices. Please refresh the page and try again."
+        `Failed to load voices: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
       );
 
-      // Fallback to default voices
+      // Fallback voices
       const fallbackVoices = [
         {
           voice_id: "21m00Tcm4TlvDq8ikWAM",
@@ -170,19 +171,24 @@ const TextToSpeechPage = () => {
       ];
       setVoices(fallbackVoices);
       if (!selectedVoice) {
-        setSelectedVoice(fallbackVoices[0].voice_id);
+        setSelectedVoice(fallbackVoices[fallbackVoices.length - 1].voice_id);
       }
     } finally {
       setIsLoadingVoices(false);
     }
   };
 
-  const handleCustomVoiceUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCustomVoiceUpload = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (file) {
       const validation = audioUtils.validateAudioFile(file);
       if (!validation.valid) {
-        setError(validation.error || "Invalid audio file. Please select a valid audio file (MP3, WAV, M4A, etc.)");
+        setError(
+          validation.error ||
+            "Invalid audio file. Please select a valid audio file (MP3, WAV, M4A, etc.)"
+        );
         return;
       }
 
@@ -193,7 +199,9 @@ const TextToSpeechPage = () => {
 
   const addCustomVoice = () => {
     if (!customVoiceFile || !customVoiceName.trim()) {
-      setError("Please provide both a voice name and audio file to create a custom voice.");
+      setError(
+        "Please provide both a voice name and audio file to create a custom voice."
+      );
       return;
     }
 
@@ -211,7 +219,9 @@ const TextToSpeechPage = () => {
     setCustomVoiceName("");
     setCustomVoiceFile(null);
     setShowCustomVoiceUpload(false);
-    setSuccess("Custom voice added successfully! You can now use it for text-to-speech generation.");
+    setSuccess(
+      "Custom voice added successfully! You can now use it for text-to-speech generation."
+    );
 
     // Clear the file input
     if (fileInputRef.current) {
@@ -220,17 +230,17 @@ const TextToSpeechPage = () => {
   };
 
   const removeCustomVoice = (voiceId: string) => {
-    const voice = customVoices.find(v => v.id === voiceId);
+    const voice = customVoices.find((v) => v.id === voiceId);
     if (voice) {
       URL.revokeObjectURL(voice.audioUrl);
     }
-    
+
     setCustomVoices((prev) => prev.filter((v) => v.id !== voiceId));
-    
+
     if (selectedVoice === voiceId) {
       setSelectedVoice(voices.length > 0 ? voices[0].voice_id : "");
     }
-    
+
     setSuccess("Custom voice removed successfully.");
   };
 
@@ -256,12 +266,14 @@ const TextToSpeechPage = () => {
 
     try {
       // Check if it's a custom voice
-      const customVoice = customVoices.find(v => v.id === selectedVoice);
-      
+      const customVoice = customVoices.find((v) => v.id === selectedVoice);
+
       if (customVoice) {
         // For custom voices, we'd need to create a voice clone first
         // For now, show a helpful message
-        setError("Custom voice text-to-speech is coming soon! For now, please use one of our premium AI voices.");
+        setError(
+          "Custom voice text-to-speech is coming soon! For now, please use one of our premium AI voices."
+        );
         return;
       }
 
@@ -286,7 +298,9 @@ const TextToSpeechPage = () => {
           `${API_BASE_URL}${response.data.audioUrl}`
         );
         if (!audioResponse.ok) {
-          throw new Error("Unable to download the generated audio. Please try again.");
+          throw new Error(
+            "Unable to download the generated audio. Please try again."
+          );
         }
 
         const blob = await audioResponse.blob();
@@ -300,29 +314,39 @@ const TextToSpeechPage = () => {
 
         setAudioBlob(blob);
         setAudioUrl(blobUrl);
-        setSuccess(`Speech generated successfully! Audio file: ${response.data.filename}`);
+        setSuccess(
+          `Speech generated successfully! Audio file: ${response.data.filename}`
+        );
 
         console.log("Speech generated successfully:", response.data.filename);
       } else {
-        throw new Error("Speech generation failed on the server. Please try again.");
+        throw new Error(
+          "Speech generation failed on the server. Please try again."
+        );
       }
     } catch (error) {
       console.error("Error generating speech:", error);
-      
+
       let userFriendlyMessage = "Unable to generate speech. Please try again.";
-      
+
       if (error instanceof Error) {
         if (error.message.includes("quota")) {
-          userFriendlyMessage = "You've reached your usage limit. Please upgrade your plan or try again later.";
-        } else if (error.message.includes("network") || error.message.includes("fetch")) {
-          userFriendlyMessage = "Network connection issue. Please check your internet connection and try again.";
+          userFriendlyMessage =
+            "You've reached your usage limit. Please upgrade your plan or try again later.";
+        } else if (
+          error.message.includes("network") ||
+          error.message.includes("fetch")
+        ) {
+          userFriendlyMessage =
+            "Network connection issue. Please check your internet connection and try again.";
         } else if (error.message.includes("voice")) {
-          userFriendlyMessage = "The selected voice is not available. Please choose a different voice.";
+          userFriendlyMessage =
+            "The selected voice is not available. Please choose a different voice.";
         } else {
           userFriendlyMessage = error.message;
         }
       }
-      
+
       setError(userFriendlyMessage);
     } finally {
       setIsGenerating(false);
@@ -343,7 +367,9 @@ const TextToSpeechPage = () => {
       setSuccess("Audio downloaded successfully!");
     } catch (error) {
       console.error("Error downloading audio:", error);
-      setError("Unable to download audio. Please try again or check your browser settings.");
+      setError(
+        "Unable to download audio. Please try again or check your browser settings."
+      );
     }
   };
 
@@ -353,11 +379,16 @@ const TextToSpeechPage = () => {
       return;
     }
 
-    navigator.clipboard.writeText(text).then(() => {
-      setSuccess("Text copied to clipboard!");
-    }).catch(() => {
-      setError("Unable to copy text. Please try selecting and copying manually.");
-    });
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        setSuccess("Text copied to clipboard!");
+      })
+      .catch(() => {
+        setError(
+          "Unable to copy text. Please try selecting and copying manually."
+        );
+      });
   };
 
   const clearError = () => setError(null);
@@ -372,17 +403,41 @@ const TextToSpeechPage = () => {
 
   // Get all available voices (built-in + custom)
   const getAllVoices = () => {
-    const allVoices = [
-      ...voices.map((v) => ({ ...v, is_custom: false })),
-      ...customVoices.map((v) => ({
-        voice_id: v.id,
-        name: v.name,
-        description: v.description || "Custom Voice",
-        is_custom: true,
-      })),
-    ];
-    return allVoices;
-  };
+  const allVoices = [
+    ...voices.map((v) => ({ ...v, is_custom: false })),
+    ...customVoices.map((v) => ({
+      voice_id: v.id,
+      name: v.name,
+      description: "Custom Voice",
+      is_custom: true,
+    })),
+  ];
+  // Reverse the entire array so last voice appears first
+  return allVoices.reverse();
+};
+
+const scrollToSelectedVoice = () => {
+  if (voicesContainerRef.current && selectedVoice) {
+    const selectedElement = voicesContainerRef.current.querySelector(
+      `[data-voice-id="${selectedVoice}"]`
+    );
+    if (selectedElement) {
+      selectedElement.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    }
+  }
+};
+
+useEffect(() => {
+  if (!isLoadingVoices && selectedVoice) {
+    setTimeout(() => {
+      scrollToSelectedVoice();
+    }, 1000);
+  }
+}, [isLoadingVoices, selectedVoice]);
+
 
   // Cleanup URLs on unmount
   useEffect(() => {
@@ -390,7 +445,7 @@ const TextToSpeechPage = () => {
       if (audioUrl) {
         URL.revokeObjectURL(audioUrl);
       }
-      customVoices.forEach(voice => {
+      customVoices.forEach((voice) => {
         URL.revokeObjectURL(voice.audioUrl);
       });
     };
@@ -473,7 +528,8 @@ const TextToSpeechPage = () => {
               }`}
             >
               <div className="text-2xl font-bold text-green-400">
-                {getAllVoices().find((v) => v.voice_id === selectedVoice)?.name || "None"}
+                {getAllVoices().find((v) => v.voice_id === selectedVoice)
+                  ?.name || "None"}
               </div>
               <div
                 className={`text-sm transition-colors duration-300 ${
@@ -565,18 +621,24 @@ const TextToSpeechPage = () => {
 
               {/* Character count and limit warning */}
               <div className="flex justify-between items-center mt-2">
-                <div className={`text-sm ${
-                  text.length > 4500 
-                    ? "text-orange-400" 
-                    : text.length > 5000 
-                      ? "text-red-400" 
-                      : theme === "dark" ? "text-gray-400" : "text-gray-600"
-                }`}>
+                <div
+                  className={`text-sm ${
+                    text.length > 4500
+                      ? "text-orange-400"
+                      : text.length > 5000
+                      ? "text-red-400"
+                      : theme === "dark"
+                      ? "text-gray-400"
+                      : "text-gray-600"
+                  }`}
+                >
                   {text.length}/5,000 characters
                 </div>
                 {text.length > 4500 && (
                   <div className="text-sm text-orange-400">
-                    {text.length > 5000 ? "Text too long!" : "Approaching character limit"}
+                    {text.length > 5000
+                      ? "Text too long!"
+                      : "Approaching character limit"}
                   </div>
                 )}
               </div>
@@ -651,7 +713,9 @@ const TextToSpeechPage = () => {
                           }`}
                         >
                           Voice:{" "}
-                          {getAllVoices().find((v) => v.voice_id === selectedVoice)?.name || "Unknown"}
+                          {getAllVoices().find(
+                            (v) => v.voice_id === selectedVoice
+                          )?.name || "Unknown"}
                           {audio.duration > 0 && (
                             <span>
                               {" "}
@@ -698,7 +762,8 @@ const TextToSpeechPage = () => {
                             : 0
                         }
                         onChange={(e) => {
-                          const newTime = (parseFloat(e.target.value) / 100) * audio.duration;
+                          const newTime =
+                            (parseFloat(e.target.value) / 100) * audio.duration;
                           audio.seek(newTime);
                         }}
                         className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-green-500"
@@ -783,7 +848,7 @@ const TextToSpeechPage = () => {
                           : "bg-white border-gray-300 text-gray-900"
                       }`}
                     />
-                    
+
                     {/* Upload option */}
                     <div className="flex gap-2">
                       <input
@@ -830,7 +895,7 @@ const TextToSpeechPage = () => {
                           <Mic className="w-5 h-5 text-black" />
                         )}
                       </button>
-                      
+
                       {audioRecorder.isRecording && (
                         <div className="mt-2 flex items-center justify-center space-x-2">
                           <Clock className="w-4 h-4 text-red-400" />
@@ -840,11 +905,14 @@ const TextToSpeechPage = () => {
                         </div>
                       )}
                     </div>
-                    
+
                     <div className="flex gap-2">
                       <button
                         onClick={addCustomVoice}
-                        disabled={!customVoiceName.trim() || (!customVoiceFile && !audioRecorder.audioBlob)}
+                        disabled={
+                          !customVoiceName.trim() ||
+                          (!customVoiceFile && !audioRecorder.audioBlob)
+                        }
                         className="flex-1 bg-green-500 text-black px-3 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Add Voice
@@ -869,7 +937,10 @@ const TextToSpeechPage = () => {
                 </div>
               )}
 
-              <div className="space-y-3 max-h-64 overflow-y-auto">
+              <div
+                ref={voicesContainerRef}
+                className="space-y-3 max-h-64 overflow-y-auto"
+              >
                 {isLoadingVoices ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader className="w-6 h-6 animate-spin text-green-400" />
@@ -879,12 +950,13 @@ const TextToSpeechPage = () => {
                   </div>
                 ) : getAllVoices().length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
-                    No voices available. Please check your connection.
+                    No voices available. Check your connection.
                   </div>
                 ) : (
                   getAllVoices().map((voice) => (
                     <div key={voice.voice_id} className="relative">
                       <button
+                        data-voice-id={voice.voice_id}
                         onClick={() => setSelectedVoice(voice.voice_id)}
                         className={`w-full p-3 rounded-xl text-left transition-all ${
                           selectedVoice === voice.voice_id
@@ -898,7 +970,7 @@ const TextToSpeechPage = () => {
                           <div>
                             <div className="font-medium">{voice.name}</div>
                             <div
-                              className={`text-sm transition-colors duration-300 ${
+                              className={`text-sm ${
                                 theme === "dark"
                                   ? "text-gray-400"
                                   : "text-gray-600"

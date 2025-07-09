@@ -128,10 +128,8 @@ const platformFeatures = [
 
 // Trust indicators
 const trustIndicators = [
-  { metric: "50M+", label: "Voices Generated", icon: Volume2 },
   { metric: "99.9%", label: "Uptime", icon: Zap },
   { metric: "150+", label: "Languages", icon: Globe },
-  { metric: "500K+", label: "Happy Users", icon: Users },
 ];
 
 export default function LandingPage() {
@@ -406,7 +404,7 @@ export default function LandingPage() {
 
               {/* Trust Indicators */}
               <motion.div
-                className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6 pt-8"
+                className="grid grid-cols-2 md:grid-cols-2 gap-4 lg:gap-6 pt-8"
                 initial={{ opacity: 0, y: 20 }}
                 animate={isHeroInView ? { opacity: 1, y: 0 } : {}}
                 transition={{ duration: 0.6, delay: 1.2 }}

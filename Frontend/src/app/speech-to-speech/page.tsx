@@ -123,6 +123,8 @@ const SpeechToSpeechPage = () => {
     }
   }, [audioRecorder.audioBlob, audioRecorder.audioUrl]);
 
+  const voicesContainerRef = useRef<HTMLDivElement>(null);
+
   const loadVoices = async () => {
     try {
       setIsLoadingVoices(true);
@@ -138,7 +140,8 @@ const SpeechToSpeechPage = () => {
         setVoices(allVoices);
 
         if (allVoices.length > 0 && !selectedVoice) {
-          setSelectedVoice(allVoices[0].voice_id);
+          // Select the last voice (original order) which will appear first in display
+          setSelectedVoice(allVoices[allVoices.length - 1].voice_id);
         }
       } else {
         throw new Error("Failed to load voices");
@@ -171,7 +174,7 @@ const SpeechToSpeechPage = () => {
       ];
       setVoices(fallbackVoices);
       if (!selectedVoice) {
-        setSelectedVoice(fallbackVoices[0].voice_id);
+        setSelectedVoice(fallbackVoices[fallbackVoices.length - 1].voice_id);
       }
     } finally {
       setIsLoadingVoices(false);
@@ -407,6 +410,14 @@ const SpeechToSpeechPage = () => {
     setError(null);
   };
 
+  useEffect(() => {
+    if (!isLoadingVoices && selectedVoice) {
+      setTimeout(() => {
+        scrollToSelectedVoice();
+      }, 1000);
+    }
+  }, [isLoadingVoices, selectedVoice]);
+
   // Get all available voices (built-in + custom)
   const getAllVoices = () => {
     const allVoices = [
@@ -418,7 +429,21 @@ const SpeechToSpeechPage = () => {
         is_custom: true,
       })),
     ];
-    return allVoices;
+    return allVoices.reverse();
+  };
+
+  const scrollToSelectedVoice = () => {
+    if (voicesContainerRef.current && selectedVoice) {
+      const selectedElement = voicesContainerRef.current.querySelector(
+        `[data-voice-id="${selectedVoice}"]`
+      );
+      if (selectedElement) {
+        selectedElement.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
+    }
   };
 
   // Helper function to format duration
@@ -1010,7 +1035,10 @@ const SpeechToSpeechPage = () => {
                 </div>
               )}
 
-              <div className="space-y-3 max-h-64 overflow-y-auto">
+              <div
+                ref={voicesContainerRef}
+                className="space-y-3 max-h-64 overflow-y-auto"
+              >
                 {isLoadingVoices ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader className="w-6 h-6 animate-spin text-green-400" />
@@ -1026,6 +1054,7 @@ const SpeechToSpeechPage = () => {
                   getAllVoices().map((voice) => (
                     <div key={voice.voice_id} className="relative">
                       <button
+                        data-voice-id={voice.voice_id}
                         onClick={() => setSelectedVoice(voice.voice_id)}
                         className={`w-full p-3 rounded-xl text-left transition-all ${
                           selectedVoice === voice.voice_id
