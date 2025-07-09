@@ -25,10 +25,10 @@ router.get("/quota", getVoiceQuota);
 router.get("/:voiceId", getVoice);
 
 // POST /api/voice/create - Create a custom voice clone
-// Accepts multiple audio files for better voice quality
+// UPDATED: Changed from array to single file upload to match ElevenLabs
 router.post(
   "/create",
-  uploadVoice.array("audioFiles", 5), // Up to 5 files for voice cloning
+  uploadVoice.single("audioFile"), // Changed from array to single file
   handleUploadError,
   createVoice
 );

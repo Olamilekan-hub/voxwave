@@ -115,15 +115,6 @@ const voiceStudioApi = {
   },
 };
 
-interface VoiceSample {
-  id: string;
-  file: File;
-  url: string;
-  duration?: number;
-  isValid: boolean;
-  error?: string;
-}
-
 interface CustomVoice {
   voice_id: string;
   elevenlabs_voice_id?: string;
@@ -138,10 +129,11 @@ interface CustomVoice {
 const VoiceStudioPage = () => {
   const { theme, mounted } = useTheme();
 
-  // Voice creation states
+  // Voice creation states - UPDATED for single file
   const [voiceName, setVoiceName] = useState("");
   const [voiceDescription, setVoiceDescription] = useState("");
-  const [voiceSamples, setVoiceSamples] = useState<VoiceSample[]>([]);
+  const [voiceSample, setVoiceSample] = useState<File | null>(null);
+  const [voiceSampleUrl, setVoiceSampleUrl] = useState<string | null>(null);
   const [isCreatingVoice, setIsCreatingVoice] = useState(false);
   const [creationProgress, setCreationProgress] = useState(0);
 
@@ -174,26 +166,79 @@ const VoiceStudioPage = () => {
     audioBitsPerSecond: 128000,
   });
 
+  // Audio player for voice sample preview
+  const sampleAudio = useAudio(voiceSampleUrl);
+
   // Load voices and quota on mount
   useEffect(() => {
     loadVoicesAndQuota();
   }, []);
 
-  // Handle recorded audio
+  // Handle recorded audio - UPDATED for single file
   useEffect(() => {
     if (audioRecorder.audioBlob && audioRecorder.audioUrl) {
-      const newSample: VoiceSample = {
-        id: Date.now().toString(),
-        file: new File([audioRecorder.audioBlob], "recorded-sample.webm", {
-          type: "audio/webm",
-        }),
-        url: audioRecorder.audioUrl,
-        isValid: true,
-      };
-      setVoiceSamples((prev) => [...prev, newSample]);
+      const recordedFile = new File([audioRecorder.audioBlob], "recorded-sample.webm", {
+        type: "audio/webm",
+      });
+      
+      // Validate the recorded file
+      const validation = validateVoiceFile(recordedFile);
+      if (!validation.valid) {
+        setError(validation.error || "Invalid recorded audio");
+        audioRecorder.clearRecording();
+        return;
+      }
+
+      setVoiceSample(recordedFile);
+      setVoiceSampleUrl(audioRecorder.audioUrl);
       audioRecorder.clearRecording();
+      setError(null);
     }
   }, [audioRecorder.audioBlob, audioRecorder.audioUrl]);
+
+  // Enhanced validation for voice cloning - UPDATED with 100KB minimum
+  const validateVoiceFile = (file: File): { valid: boolean; error?: string } => {
+    const allowedTypes = [
+      'audio/mpeg',
+      'audio/mp3',
+      'audio/wav',
+      'audio/wave',
+      'audio/x-wav',
+      'audio/flac',
+      'audio/x-flac',
+      'audio/mp4',
+      'audio/m4a',
+      'audio/aac',
+      'audio/ogg',
+      'audio/webm'
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      return {
+        valid: false,
+        error: 'Invalid file type. Please upload MP3, WAV, M4A, FLAC, or OGG files.'
+      };
+    }
+
+    const maxSize = 25 * 1024 * 1024; // 25MB
+    if (file.size > maxSize) {
+      return {
+        valid: false,
+        error: 'File size too large. Maximum size is 25MB.'
+      };
+    }
+
+    // UPDATED: New minimum size for voice cloning - 100KB
+    const minSize = 100 * 1024; // 100KB minimum (matches ElevenLabs requirement)
+    if (file.size < minSize) {
+      return {
+        valid: false,
+        error: 'File size too small. Minimum size is 100KB for voice cloning.'
+      };
+    }
+
+    return { valid: true };
+  };
 
   const loadVoicesAndQuota = async () => {
     try {
@@ -224,47 +269,57 @@ const VoiceStudioPage = () => {
     }
   };
 
+  // UPDATED: Handle single file upload
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    if (files.length === 0) return;
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-    files.forEach((file) => {
-      const validation = audioUtils.validateAudioFile(file);
-      const sample: VoiceSample = {
-        id: Date.now().toString() + Math.random(),
-        file,
-        url: URL.createObjectURL(file),
-        isValid: validation.valid,
-        error: validation.error,
-      };
+    const validation = validateVoiceFile(file);
+    if (!validation.valid) {
+      setError(validation.error || "Invalid file");
+      return;
+    }
 
-      setVoiceSamples((prev) => [...prev, sample]);
-    });
+    // Clear previous sample
+    if (voiceSampleUrl) {
+      URL.revokeObjectURL(voiceSampleUrl);
+    }
 
-    // Clear input for multiple uploads
+    setVoiceSample(file);
+    const url = URL.createObjectURL(file);
+    setVoiceSampleUrl(url);
+    setError(null);
+
+    // Clear input for future uploads
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
 
+  // UPDATED: Handle single file drop
   const handleDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     setIsDragging(false);
 
-    const files = Array.from(event.dataTransfer.files);
-    files.forEach((file) => {
-      const validation = audioUtils.validateAudioFile(file);
-      const sample: VoiceSample = {
-        id: Date.now().toString() + Math.random(),
-        file,
-        url: URL.createObjectURL(file),
-        isValid: validation.valid,
-        error: validation.error,
-      };
+    const file = event.dataTransfer.files[0];
+    if (!file) return;
 
-      setVoiceSamples((prev) => [...prev, sample]);
-    });
-  }, []);
+    const validation = validateVoiceFile(file);
+    if (!validation.valid) {
+      setError(validation.error || "Invalid file");
+      return;
+    }
+
+    // Clear previous sample
+    if (voiceSampleUrl) {
+      URL.revokeObjectURL(voiceSampleUrl);
+    }
+
+    setVoiceSample(file);
+    const url = URL.createObjectURL(file);
+    setVoiceSampleUrl(url);
+    setError(null);
+  }, [voiceSampleUrl]);
 
   const handleDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -276,30 +331,24 @@ const VoiceStudioPage = () => {
     setIsDragging(false);
   }, []);
 
-  const removeSample = (sampleId: string) => {
-    setVoiceSamples((prev) => {
-      const sample = prev.find((s) => s.id === sampleId);
-      if (sample) {
-        URL.revokeObjectURL(sample.url);
-      }
-      return prev.filter((s) => s.id !== sampleId);
-    });
+  // UPDATED: Remove single sample
+  const removeSample = () => {
+    if (voiceSampleUrl) {
+      URL.revokeObjectURL(voiceSampleUrl);
+    }
+    setVoiceSample(null);
+    setVoiceSampleUrl(null);
   };
 
+  // UPDATED: Create voice with single file
   const createVoice = async () => {
     if (!voiceName.trim()) {
       setError("Please enter a voice name");
       return;
     }
 
-    const validSamples = voiceSamples.filter((s) => s.isValid);
-    if (validSamples.length === 0) {
-      setError("Please add at least one valid voice sample");
-      return;
-    }
-
-    if (validSamples.length > 5) {
-      setError("Maximum 5 voice samples allowed");
+    if (!voiceSample) {
+      setError("Please upload a voice sample");
       return;
     }
 
@@ -317,14 +366,8 @@ const VoiceStudioPage = () => {
       );
       formData.append("labels", JSON.stringify(voiceLabels));
 
-      // Add audio files
-      validSamples.forEach((sample, index) => {
-        formData.append(
-          "audioFiles",
-          sample.file,
-          `sample-${index + 1}.${sample.file.name.split(".").pop()}`
-        );
-      });
+      // UPDATED: Add single audio file with proper field name
+      formData.append("audioFile", voiceSample, `voice-sample.${voiceSample.name.split(".").pop()}`);
 
       // Simulate progress
       const progressInterval = setInterval(() => {
@@ -349,7 +392,7 @@ const VoiceStudioPage = () => {
         // Reset form
         setVoiceName("");
         setVoiceDescription("");
-        setVoiceSamples([]);
+        removeSample();
         setCreationProgress(0);
 
         // Reload voices
@@ -451,7 +494,7 @@ const VoiceStudioPage = () => {
             </div>
 
             {/* Tab Navigation */}
-            {/* <div
+            <div
               className={`flex rounded-xl p-1 ${
                 theme === "dark" ? "bg-gray-900" : "bg-gray-100"
               }`}
@@ -480,84 +523,8 @@ const VoiceStudioPage = () => {
               >
                 Manage Voices
               </button>
-            </div> */}
-          </div>
-
-          {/* Quota Info */}
-          {/* {quota && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div
-                className={`p-4 rounded-xl ${
-                  theme === "dark" ? "bg-gray-900" : "bg-gray-50"
-                }`}
-              >
-                <div className="text-2xl font-bold text-green-400">
-                  {quota.voices_created || 0}
-                </div>
-                <div
-                  className={`text-sm ${
-                    theme === "dark" ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
-                  Voices Created
-                </div>
-              </div>
-              <div
-                className={`p-4 rounded-xl ${
-                  theme === "dark" ? "bg-gray-900" : "bg-gray-50"
-                }`}
-              >
-                <div className="text-2xl font-bold text-green-400">
-                  {quota.voices_remaining || 0}
-                </div>
-                <div
-                  className={`text-sm ${
-                    theme === "dark" ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
-                  Remaining
-                </div>
-              </div>
-              <div
-                className={`p-4 rounded-xl ${
-                  theme === "dark" ? "bg-gray-900" : "bg-gray-50"
-                }`}
-              >
-                <div className="text-2xl font-bold text-green-400">
-                  {quota.subscription_tier || "Free"}
-                </div>
-                <div
-                  className={`text-sm ${
-                    theme === "dark" ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
-                  Plan
-                </div>
-              </div>
-              <div
-                className={`p-4 rounded-xl ${
-                  theme === "dark" ? "bg-gray-900" : "bg-gray-50"
-                }`}
-              >
-                <div className="text-2xl font-bold text-green-400">
-                  {quota.character_usage
-                    ? `${Math.round(
-                        (quota.character_usage.remaining /
-                          quota.character_usage.limit) *
-                          100
-                      )}%`
-                    : "100%"}
-                </div>
-                <div
-                  className={`text-sm ${
-                    theme === "dark" ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
-                  Credits Left
-                </div>
-              </div>
             </div>
-          )} */}
+          </div>
         </div>
       </div>
 
@@ -649,7 +616,7 @@ const VoiceStudioPage = () => {
                 </div>
               </div>
 
-              {/* Voice Samples */}
+              {/* UPDATED: Voice Sample (Single File) */}
               <div
                 className={`p-6 rounded-2xl border-2 ${
                   theme === "dark"
@@ -659,115 +626,164 @@ const VoiceStudioPage = () => {
               >
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="text-xl font-semibold">Voice Samples</h2>
+                    <h2 className="text-xl font-semibold">Voice Sample</h2>
                     <p
                       className={`text-sm ${
                         theme === "dark" ? "text-gray-400" : "text-gray-600"
                       }`}
                     >
-                      Upload 1-5 high-quality audio samples (minimum 30 seconds
-                      each)
+                      Upload one high-quality audio sample (minimum 100KB, recommended 30+ seconds)
                     </p>
                   </div>
                   <div className="text-sm text-green-400 font-medium">
-                    {voiceSamples.filter((s) => s.isValid).length}/5 samples
+                    {voiceSample ? "1/1 sample" : "0/1 sample"}
                   </div>
                 </div>
 
-                {/* Upload Area */}
-                <div
-                  onDrop={handleDrop}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
-                    isDragging
-                      ? "border-green-500 bg-green-500/10"
-                      : theme === "dark"
-                      ? "border-gray-600 hover:border-green-500 bg-gray-800/50"
-                      : "border-gray-300 hover:border-green-500 bg-gray-50"
-                  }`}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                  <h3 className="text-lg font-medium mb-2">
-                    Upload Audio Samples
-                  </h3>
-                  <p
-                    className={`${
-                      theme === "dark" ? "text-gray-400" : "text-gray-600"
-                    } mb-4`}
-                  >
-                    Drop your audio files here or click to browse
-                  </p>
-                  <p
-                    className={`text-sm ${
-                      theme === "dark" ? "text-gray-500" : "text-gray-500"
-                    }`}
-                  >
-                    Supports MP3, WAV, M4A, FLAC (Max 25MB each)
-                  </p>
-                </div>
-
-                {/* Recording Option */}
-                <div
-                  className={`mt-6 p-4 rounded-xl ${
-                    theme === "dark" ? "bg-gray-800" : "bg-gray-100"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Record Audio Sample</h4>
+                {!voiceSample ? (
+                  <>
+                    {/* Upload Area */}
+                    <div
+                      onDrop={handleDrop}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
+                        isDragging
+                          ? "border-green-500 bg-green-500/10"
+                          : theme === "dark"
+                          ? "border-gray-600 hover:border-green-500 bg-gray-800/50"
+                          : "border-gray-300 hover:border-green-500 bg-gray-50"
+                      }`}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                      <h3 className="text-lg font-medium mb-2">
+                        Upload Voice Sample
+                      </h3>
+                      <p
+                        className={`${
+                          theme === "dark" ? "text-gray-400" : "text-gray-600"
+                        } mb-4`}
+                      >
+                        Drop your audio file here or click to browse
+                      </p>
                       <p
                         className={`text-sm ${
-                          theme === "dark" ? "text-gray-400" : "text-gray-600"
+                          theme === "dark" ? "text-gray-500" : "text-gray-500"
                         }`}
                       >
-                        Record directly from your microphone
+                        Supports MP3, WAV, M4A, FLAC (Min: 100KB, Max: 25MB)
                       </p>
                     </div>
-                    <button
-                      onClick={
-                        audioRecorder.isRecording
-                          ? audioRecorder.stopRecording
-                          : audioRecorder.startRecording
-                      }
-                      disabled={!audioRecorder.isSupported}
-                      className={`w-16 h-16 rounded-full flex items-center justify-center transition-all disabled:opacity-50 ${
-                        audioRecorder.isRecording
-                          ? "bg-red-500 hover:bg-red-600 animate-pulse"
-                          : "bg-gradient-to-r from-green-400 to-green-600 hover:shadow-lg hover:shadow-green-500/25"
+
+                    {/* Recording Option */}
+                    <div
+                      className={`mt-6 p-4 rounded-xl ${
+                        theme === "dark" ? "bg-gray-800" : "bg-gray-100"
                       }`}
                     >
-                      {audioRecorder.isRecording ? (
-                        <MicOff className="w-6 h-6 text-white" />
-                      ) : (
-                        <Mic className="w-6 h-6 text-black" />
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium">Record Voice Sample</h4>
+                          <p
+                            className={`text-sm ${
+                              theme === "dark" ? "text-gray-400" : "text-gray-600"
+                            }`}
+                          >
+                            Record directly from your microphone
+                          </p>
+                        </div>
+                        <button
+                          onClick={
+                            audioRecorder.isRecording
+                              ? audioRecorder.stopRecording
+                              : audioRecorder.startRecording
+                          }
+                          disabled={!audioRecorder.isSupported}
+                          className={`w-16 h-16 rounded-full flex items-center justify-center transition-all disabled:opacity-50 ${
+                            audioRecorder.isRecording
+                              ? "bg-red-500 hover:bg-red-600 animate-pulse"
+                              : "bg-gradient-to-r from-green-400 to-green-600 hover:shadow-lg hover:shadow-green-500/25"
+                          }`}
+                        >
+                          {audioRecorder.isRecording ? (
+                            <MicOff className="w-6 h-6 text-white" />
+                          ) : (
+                            <Mic className="w-6 h-6 text-black" />
+                          )}
+                        </button>
+                      </div>
+
+                      {audioRecorder.isRecording && (
+                        <div className="mt-4 flex items-center space-x-3">
+                          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                          <span className="text-sm font-medium">
+                            Recording: {formatDuration(audioRecorder.duration)}
+                          </span>
+                        </div>
                       )}
-                    </button>
-                  </div>
-
-                  {audioRecorder.isRecording && (
-                    <div className="mt-4 flex items-center space-x-3">
-                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                      <span className="text-sm font-medium">
-                        Recording: {formatDuration(audioRecorder.duration)}
-                      </span>
                     </div>
-                  )}
-                </div>
+                  </>
+                ) : (
+                  /* Sample Display */
+                  <div
+                    className={`p-4 rounded-xl border ${
+                      theme === "dark"
+                        ? "border-gray-700 bg-gray-800"
+                        : "border-gray-200 bg-gray-50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <button
+                          onClick={sampleAudio.play}
+                          disabled={!sampleAudio.canPlay || sampleAudio.isLoading}
+                          className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-black hover:bg-green-600 transition-colors disabled:opacity-50"
+                        >
+                          {sampleAudio.isLoading ? (
+                            <Loader className="w-4 h-4 animate-spin" />
+                          ) : sampleAudio.isPlaying ? (
+                            <Pause className="w-4 h-4" />
+                          ) : (
+                            <Play className="w-4 h-4 ml-0.5" />
+                          )}
+                        </button>
 
-                {/* Sample List */}
-                {voiceSamples.length > 0 && (
-                  <div className="mt-6 space-y-3">
-                    <h4 className="font-medium">Uploaded Samples</h4>
-                    {voiceSamples.map((sample) => (
-                      <SampleItem
-                        key={sample.id}
-                        sample={sample}
-                        onRemove={removeSample}
-                        theme={theme}
-                      />
-                    ))}
+                        <div>
+                          <div className="font-medium text-sm">{voiceSample.name}</div>
+                          <div
+                            className={`text-xs ${
+                              theme === "dark" ? "text-gray-400" : "text-gray-600"
+                            }`}
+                          >
+                            {audioUtils.formatFileSize(voiceSample.size)}
+                            {sampleAudio.duration > 0 &&
+                              ` • ${audioUtils.formatDuration(sampleAudio.duration)}`}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={removeSample}
+                        className="p-2 rounded-lg text-red-400 hover:bg-red-500/20 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Progress bar for playing audio */}
+                    {sampleAudio.duration > 0 && (
+                      <div className="mt-3">
+                        <div className="w-full bg-gray-300 rounded-full h-1">
+                          <div
+                            className="bg-green-500 h-1 rounded-full transition-all"
+                            style={{
+                              width: `${(sampleAudio.currentTime / sampleAudio.duration) * 100}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -775,7 +791,6 @@ const VoiceStudioPage = () => {
                   ref={fileInputRef}
                   type="file"
                   accept="audio/*"
-                  multiple
                   onChange={handleFileUpload}
                   className="hidden"
                 />
@@ -808,7 +823,7 @@ const VoiceStudioPage = () => {
                       }`}
                     >
                       {creationProgress < 30
-                        ? "Uploading samples..."
+                        ? "Uploading sample..."
                         : creationProgress < 60
                         ? "Processing audio..."
                         : creationProgress < 90
@@ -891,12 +906,12 @@ const VoiceStudioPage = () => {
                 </div>
               </div>
 
-              {/* Create Button */}
+              {/* Create Button - UPDATED validation */}
               <button
                 onClick={createVoice}
                 disabled={
                   !voiceName.trim() ||
-                  voiceSamples.filter((s) => s.isValid).length === 0 ||
+                  !voiceSample ||
                   isCreatingVoice
                 }
                 className="w-full bg-gradient-to-r from-green-400 to-green-600 text-black py-4 rounded-xl font-semibold hover:shadow-lg hover:shadow-green-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
@@ -914,7 +929,7 @@ const VoiceStudioPage = () => {
                 )}
               </button>
 
-              {/* Tips */}
+              {/* UPDATED Tips */}
               <div
                 className={`p-4 rounded-xl ${
                   theme === "dark"
@@ -931,17 +946,18 @@ const VoiceStudioPage = () => {
                   }`}
                 >
                   <li>• Use clear, high-quality recordings</li>
-                  <li>• Include diverse emotional expressions</li>
-                  <li>• Ensure consistent speaking pace</li>
+                  <li>• Record at least 30 seconds of natural speech</li>
+                  <li>• Speak at your normal pace and tone</li>
                   <li>• Avoid background noise</li>
                   <li>• Record in a quiet environment</li>
+                  <li>• One good sample is better than multiple poor ones</li>
                 </ul>
               </div>
             </div>
           </div>
         )}
 
-        {/* MANAGE VOICES TAB */}
+        {/* MANAGE VOICES TAB - Unchanged */}
         {activeTab === "manage" && (
           <div>
             <div className="flex items-center justify-between mb-8">
@@ -1015,87 +1031,7 @@ const VoiceStudioPage = () => {
   );
 };
 
-// Sample Item Component
-const SampleItem = ({
-  sample,
-  onRemove,
-  theme,
-}: {
-  sample: VoiceSample;
-  onRemove: (id: string) => void;
-  theme: string;
-}) => {
-  const audio = useAudio(sample.url);
-
-  return (
-    <div
-      className={`p-4 rounded-xl border ${
-        sample.isValid
-          ? theme === "dark"
-            ? "border-gray-700 bg-gray-800"
-            : "border-gray-200 bg-gray-50"
-          : "border-red-500/50 bg-red-500/10"
-      }`}
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={audio.play}
-            disabled={!audio.canPlay || audio.isLoading || !sample.isValid}
-            className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-black hover:bg-green-600 transition-colors disabled:opacity-50"
-          >
-            {audio.isLoading ? (
-              <Loader className="w-4 h-4 animate-spin" />
-            ) : audio.isPlaying ? (
-              <Pause className="w-4 h-4" />
-            ) : (
-              <Play className="w-4 h-4 ml-0.5" />
-            )}
-          </button>
-
-          <div>
-            <div className="font-medium text-sm">{sample.file.name}</div>
-            <div
-              className={`text-xs ${
-                theme === "dark" ? "text-gray-400" : "text-gray-600"
-              }`}
-            >
-              {audioUtils.formatFileSize(sample.file.size)}
-              {audio.duration > 0 &&
-                ` • ${audioUtils.formatDuration(audio.duration)}`}
-            </div>
-            {!sample.isValid && sample.error && (
-              <div className="text-xs text-red-400 mt-1">{sample.error}</div>
-            )}
-          </div>
-        </div>
-
-        <button
-          onClick={() => onRemove(sample.id)}
-          className="p-2 rounded-lg text-red-400 hover:bg-red-500/20 transition-colors"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* Progress bar for playing audio */}
-      {audio.duration > 0 && (
-        <div className="mt-3">
-          <div className="w-full bg-gray-300 rounded-full h-1">
-            <div
-              className="bg-green-500 h-1 rounded-full transition-all"
-              style={{
-                width: `${(audio.currentTime / audio.duration) * 100}%`,
-              }}
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Voice Card Component
+// Voice Card Component - Unchanged
 const VoiceCard = ({
   voice,
   onDelete,
