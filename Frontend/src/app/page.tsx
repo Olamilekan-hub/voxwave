@@ -110,20 +110,6 @@ const platformFeatures = [
     color: "from-orange-400 to-orange-600",
     href: "/voice-effects",
   },
-  {
-    id: "api-integration",
-    title: "API Integration",
-    icon: Cpu,
-    description: "Integrate VoxWave's power directly into your applications",
-    features: [
-      "REST API",
-      "WebSocket Support",
-      "SDKs Available",
-      "Scalable Infrastructure",
-    ],
-    color: "from-indigo-400 to-indigo-600",
-    href: "/api",
-  },
 ];
 
 // Trust indicators
