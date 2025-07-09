@@ -198,7 +198,7 @@ const validateAudioForVoiceCloning = async (filePath, fileSize) => {
   }
 };
 
-// List all available voices (ElevenLabs + custom) - ENHANCED
+// FIXED: List all available voices (ElevenLabs + custom) - No duplicates
 const listVoices = async (req, res) => {
   try {
     console.log('📋 Fetching all available voices...');
@@ -213,8 +213,9 @@ const listVoices = async (req, res) => {
        ORDER BY created_at DESC`
     );
 
+    // FIXED: Transform custom voices and ensure no duplicates
     const customVoices = customVoicesResult.rows.map(voice => ({
-      voice_id: voice.voice_id,
+      voice_id: voice.voice_id, // Use our internal voice_id, not elevenlabs_voice_id
       elevenlabs_voice_id: voice.elevenlabs_voice_id,
       name: voice.name,
       description: voice.description,
@@ -223,15 +224,23 @@ const listVoices = async (req, res) => {
       created_at: voice.created_at,
       file_size: voice.file_size
     }));
+
+    // FIXED: Ensure ElevenLabs voices don't include any custom voices
+    const elevenLabsOnlyVoices = (elevenLabsVoices.voices || []).filter(voice => {
+      // Filter out any voice that matches a custom voice's ElevenLabs ID
+      return !customVoices.some(customVoice => 
+        customVoice.elevenlabs_voice_id === voice.voice_id
+      );
+    });
     
     const response = {
       success: true,
       data: {
-        elevenLabsVoices: elevenLabsVoices.voices || [],
-        customVoices: customVoices,
-        total: (elevenLabsVoices.voices?.length || 0) + customVoices.length,
+        elevenLabsVoices: elevenLabsOnlyVoices, // FIXED: Only pure ElevenLabs voices
+        customVoices: customVoices, // Custom voices separately
+        total: elevenLabsOnlyVoices.length + customVoices.length,
         counts: {
-          elevenlabs: elevenLabsVoices.voices?.length || 0,
+          elevenlabs: elevenLabsOnlyVoices.length,
           custom: customVoices.length
         }
       },

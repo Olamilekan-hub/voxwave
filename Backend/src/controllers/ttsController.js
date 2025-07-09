@@ -4,7 +4,7 @@ const { saveGeneratedAudio } = require('../middleware/upload');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 
-// Get available voices from ElevenLabs
+// FIXED: Get available voices from ElevenLabs (no duplicates)
 const getVoices = async (req, res) => {
   try {
     console.log('🎤 Fetching available voices...');
@@ -14,15 +14,34 @@ const getVoices = async (req, res) => {
     
     // Also get custom voices from database
     const customVoicesResult = await query(
-      'SELECT voice_id, name, description, created_at FROM voices ORDER BY created_at DESC'
+      'SELECT voice_id, elevenlabs_voice_id, name, description, created_at FROM voices ORDER BY created_at DESC'
     );
+
+    // FIXED: Transform custom voices properly
+    const customVoices = customVoicesResult.rows.map(voice => ({
+      voice_id: voice.voice_id, // Use our internal voice_id
+      elevenlabs_voice_id: voice.elevenlabs_voice_id,
+      name: voice.name,
+      description: voice.description,
+      category: 'custom',
+      is_custom: true,
+      created_at: voice.created_at
+    }));
+
+    // FIXED: Filter out ElevenLabs voices that are already custom voices
+    const elevenLabsOnlyVoices = (voicesData.voices || []).filter(voice => {
+      // Filter out any voice that matches a custom voice's ElevenLabs ID
+      return !customVoices.some(customVoice => 
+        customVoice.elevenlabs_voice_id === voice.voice_id
+      );
+    });
     
     const response = {
       success: true,
       data: {
-        elevenLabsVoices: voicesData.voices || [],
-        customVoices: customVoicesResult.rows,
-        total: (voicesData.voices?.length || 0) + customVoicesResult.rows.length
+        elevenLabsVoices: elevenLabsOnlyVoices, // FIXED: Only pure ElevenLabs voices
+        customVoices: customVoices, // Custom voices separately
+        total: elevenLabsOnlyVoices.length + customVoices.length
       },
       message: 'Voices fetched successfully'
     };
@@ -71,16 +90,31 @@ const generateSpeech = async (req, res) => {
     
     console.log(`🗣️ Generating speech for ${text.length} characters using voice: ${voiceId}`);
     
-    // Check if it's a custom voice from our database
+    // FIXED: Check if it's a custom voice from our database
     let actualVoiceId = voiceId;
+    let voiceName = 'Unknown Voice';
+    let isCustomVoice = false;
+    
     const customVoiceResult = await query(
-      'SELECT elevenlabs_voice_id FROM voices WHERE voice_id = $1',
+      'SELECT elevenlabs_voice_id, name FROM voices WHERE voice_id = $1',
       [voiceId]
     );
     
     if (customVoiceResult.rows.length > 0) {
       actualVoiceId = customVoiceResult.rows[0].elevenlabs_voice_id;
-      console.log(`🎭 Using custom voice mapping: ${voiceId} -> ${actualVoiceId}`);
+      voiceName = customVoiceResult.rows[0].name;
+      isCustomVoice = true;
+      console.log(`🎭 Using custom voice mapping: ${voiceId} -> ${actualVoiceId} (${voiceName})`);
+    } else {
+      // It's a regular ElevenLabs voice, try to get the name
+      try {
+        const voicesData = await ElevenLabsService.getVoices();
+        const voice = voicesData.voices.find(v => v.voice_id === voiceId);
+        voiceName = voice ? voice.name : voiceId;
+      } catch (error) {
+        console.warn('Could not fetch voice name:', error.message);
+        voiceName = voiceId;
+      }
     }
     
     // Generate speech using ElevenLabs
@@ -112,7 +146,9 @@ const generateSpeech = async (req, res) => {
           options,
           characterCount: text.length,
           voiceUsed: actualVoiceId,
-          originalVoiceId: voiceId
+          originalVoiceId: voiceId,
+          voiceName: voiceName,
+          isCustomVoice: isCustomVoice
         })
       ]
     );
@@ -122,7 +158,7 @@ const generateSpeech = async (req, res) => {
     await updateUsageStats('audio_files_generated', 1);
     await updateUsageStats('api_calls_made', 1);
     
-    console.log(`✅ Speech generated successfully: ${filename}`);
+    console.log(`✅ Speech generated successfully: ${filename} using ${isCustomVoice ? 'custom' : 'ElevenLabs'} voice: ${voiceName}`);
     
     const response = {
       success: true,
@@ -134,9 +170,11 @@ const generateSpeech = async (req, res) => {
         duration: Math.ceil(text.length / 200), // Rough estimate: 200 chars per minute
         characterCount: text.length,
         voiceUsed: voiceId,
+        voiceName: voiceName,
+        isCustomVoice: isCustomVoice,
         createdAt: new Date().toISOString()
       },
-      message: 'Speech generated successfully'
+      message: `Speech generated successfully using ${isCustomVoice ? 'custom' : 'ElevenLabs'} voice: ${voiceName}`
     };
     
     res.json(response);
