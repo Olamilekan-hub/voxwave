@@ -13,7 +13,7 @@ const Footer = () => {
       { name: "Text to Speech", href: "/text-to-speech" },
       { name: "Speech to Speech", href: "/speech-to-speech" },
       { name: "Speech to Text", href: "/speech-to-text" },
-      { name: "API Documentation", href: "/docs" },
+      { name: "Voice Studio", href: "/voice-studio" },
     ],
     company: [
       { name: "About Us", href: "/about" },
@@ -45,7 +45,7 @@ const Footer = () => {
     >
       <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Main Footer Content */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-8 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8">
           {/* Brand Section */}
           <div className="lg:col-span-2">
             <div className="flex items-center space-x-3 mb-4">
@@ -78,7 +78,7 @@ const Footer = () => {
             {/* Social Links */}
             <div className="flex space-x-4">
               <a
-                href="https://twitter.com/voxwave"
+                href="https://twitter.com/usevoxwave"
                 className={`p-2 rounded-lg transition-colors ${
                   theme === "dark"
                     ? "bg-gray-800 hover:bg-gray-700"
@@ -88,7 +88,7 @@ const Footer = () => {
                 <Twitter className="w-5 h-5" />
               </a>
               <a
-                href="https://github.com/voxwave"
+                href="#"
                 className={`p-2 rounded-lg transition-colors ${
                   theme === "dark"
                     ? "bg-gray-800 hover:bg-gray-700"
@@ -96,9 +96,9 @@ const Footer = () => {
                 }`}
               >
                 <Github className="w-5 h-5" />
-              </a>
+              </a>  
               <a
-                href="mailto:hello@voxwave.ai"
+                href="mailto:voxwaave3@gmail.com"
                 className={`p-2 rounded-lg transition-colors ${
                   theme === "dark"
                     ? "bg-gray-800 hover:bg-gray-700"
@@ -138,7 +138,7 @@ const Footer = () => {
           </div>
 
           {/* Company Links */}
-          <div>
+          {/* <div>
             <h4
               className={`font-semibold mb-4 ${
                 theme === "dark" ? "text-white" : "text-gray-900"
@@ -162,10 +162,10 @@ const Footer = () => {
                 </li>
               ))}
             </ul>
-          </div>
+          </div> */}
 
           {/* Support Links */}
-          <div>
+          {/* <div>
             <h4
               className={`font-semibold mb-4 ${
                 theme === "dark" ? "text-white" : "text-gray-900"
@@ -189,10 +189,10 @@ const Footer = () => {
                 </li>
               ))}
             </ul>
-          </div>
+          </div> */}
 
           {/* Legal Links */}
-          <div>
+          {/* <div>
             <h4
               className={`font-semibold mb-4 ${
                 theme === "dark" ? "text-white" : "text-gray-900"
@@ -216,7 +216,7 @@ const Footer = () => {
                 </li>
               ))}
             </ul>
-          </div>
+          </div> */}
         </div>
 
         {/* Bottom Section */}
@@ -242,7 +242,7 @@ const Footer = () => {
           >
             <span>Powered by VoxWave</span>
             <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
-            <span>v2.1.0</span>
+            <span>v1.0.0</span>
           </div>
         </div>
       </div>
