@@ -54,6 +54,8 @@ const corsOptions = {
       'http://localhost:3000',
       'http://localhost:3001',
       'https://voxwave.vercel.app',
+      'https://voxwave.net',
+      'https://www.voxwave.net',
     ].filter(Boolean);
 
     if (allowedOrigins.includes(origin)) {
